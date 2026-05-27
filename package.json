@@ -41,7 +41,7 @@
     "next": "^16.2.4",
     "nodemailer": "^6.10.1",
     "posthog-js": "^1.373.5",
-    "prisma": "^5.22.0",
+    "prisma": "^7.8.0",
     "pusher": "^5.3.3",
     "pusher-js": "^8.5.0",
     "react": "^19.2.5",
