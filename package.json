@@ -38,7 +38,7 @@
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^1.14.0",
     "mysql2": "^3.11.5",
-    "next": "^16.2.4",
+    "next": "^16.2.6",
     "nodemailer": "^6.10.1",
     "posthog-js": "^1.373.5",
     "prisma": "^5.22.0",
