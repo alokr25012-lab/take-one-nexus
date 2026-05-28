@@ -7,6 +7,7 @@ const Navbar = {
     config: [
         { label: 'Discover Projects', href: '/#explore' },
         { label: 'Find Crew', href: '/crew', id: 'navCrewLink' },
+        { label: 'Leaderboard', href: '/leaderboard' },
         { label: 'Share Your Script', href: '/#upload', id: 'navUploadLink' },
         { label: 'Profile', href: '/profile' }
     ],
@@ -65,7 +66,7 @@ const Navbar = {
         if (user) {
             html += `
                 <button id="loginBtn" class="nav-cta" style="background: var(--neon); border: none; padding: 9px 20px; cursor: pointer; font-family: 'Bebas Neue', sans-serif; font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase;">
-                    Logout
+                    My Signal
                 </button>
             `;
         } else {
@@ -108,16 +109,8 @@ const Navbar = {
         };
 
         if (user) {
-            btn.addEventListener('click', async () => {
-                try {
-                    if (typeof API !== 'undefined' && API.auth) {
-                        await API.auth.logout();
-                    } else {
-                        console.error('Logout requested but API.auth is unavailable');
-                    }
-                } catch (error) {
-                    console.error('Navbar logout failed:', error);
-                }
+            btn.addEventListener('click', () => {
+                window.location.href = '/profile';
             });
             return;
         }

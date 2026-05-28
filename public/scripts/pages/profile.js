@@ -69,7 +69,7 @@ function renderSkillBadges(skills) {
 function setProfileGate(show) {
     const gate = document.getElementById('profileAuthGate');
     const main = document.querySelector('.profile-main');
-    const logout = document.getElementById('profileLogoutBtn');
+    const logout = document.getElementById('navCta');
 
     if (gate) gate.hidden = !show;
     if (main) main.hidden = show;
@@ -652,7 +652,7 @@ function initProfile() {
     if (workForm) workForm.onsubmit = handleWorkSubmit;
 
     /* Logout */
-    const logoutBtn = document.getElementById('profileLogoutBtn');
+    const logoutBtn = document.getElementById('navCta');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
             if (typeof API !== 'undefined' && API.auth) {

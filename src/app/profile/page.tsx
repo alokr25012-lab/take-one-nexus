@@ -131,12 +131,12 @@ export default async function ProfilePage({
         <header>
           <a href="/" className="logo">TAKE <span>ONE</span></a>
           <nav>
-            <a href="/">Home</a>
             <a href="/#explore">Discover Projects</a>
             <a href="/crew">Find Crew</a>
             <a href="/leaderboard">Leaderboard</a>
-            <a href="/chat" className="nav-chat-link">Messages</a>
-            {isOwner && <button className="profile-logout" id="profileLogoutBtn" type="button">Logout</button>}
+            <a href="/#upload">Share Your Script</a>
+            <a href="/profile">Profile</a>
+            <button id="navCta" className="nav-cta" type="button">My Signal</button>
           </nav>
         </header>
 
