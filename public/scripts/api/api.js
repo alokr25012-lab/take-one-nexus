@@ -307,6 +307,7 @@ const API = (() => {
         localStorage.setItem(TOKEN_KEY, token);
         localStorage.setItem(USER_KEY, JSON.stringify(user));
         localStorage.setItem('take_one_session_start', Date.now());
+        window.dispatchEvent(new CustomEvent('takeone:auth-changed', { detail: { user } }));
       },
       getToken() {
         return localStorage.getItem(TOKEN_KEY);

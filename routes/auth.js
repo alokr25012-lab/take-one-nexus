@@ -7,11 +7,11 @@ const { captureError } = require('../src/lib/sentry');
 
 const router = express.Router();
 
-// Initialize Resend
-if (!process.env.RESEND_API_KEY) {
-  console.warn('[AUTH] WARNING: RESEND_API_KEY not configured. Password reset emails will not be sent.');
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return null;
+  return new Resend(apiKey);
 }
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Rate limiter for forgot password
 const forgotPasswordLimiter = createRateLimiter({
@@ -197,6 +197,15 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
         console.log('[Forgot Password] RESEND_API_KEY is configured');
         console.log('[Forgot Password] Sending reset email to:', user.email);
         console.log('[Forgot Password] Reset URL:', resetUrl);
+        const resend = getResendClient();
+        if (!resend) {
+          console.error('[Forgot Password] Cannot send email: RESEND_API_KEY not configured');
+          return res.json({
+            success: true,
+            message: 'If this email is registered, a reset link has been sent.'
+          });
+        }
+
         const result = await resend.emails.send({
           from: 'TAKE ONE NEXUS <onboarding@takeone-nexus.net.in>',
           to: user.email,

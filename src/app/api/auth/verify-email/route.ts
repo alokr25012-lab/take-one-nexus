@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import * as jose from 'jose';
 import prisma from '@/lib/prisma';
 import { awardCreditTask } from '@/lib/credits';
 import {
@@ -13,7 +14,28 @@ import { checkRateLimit, getClientIP, buildRateLimitKey } from '@/lib/rate-limit
 import { RATE_LIMITS } from '@/lib/rate-limit-config';
 import { captureError } from '@/lib/sentry';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || 'takeone_fallback_secret_32_chars_long'
+);
+
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return null;
+  return new Resend(apiKey);
+}
+
+function getCookieOptions() {
+  const isProd = process.env.NODE_ENV === 'production';
+  const isVercelPreview = Boolean(process.env.VERCEL_URL?.includes('vercel.app'));
+  return {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
+    path: '/',
+    maxAge: 10 * 24 * 60 * 60,
+    domain: isProd && !isVercelPreview ? '.takeone-nexus.net.in' : undefined,
+  };
+}
 
 /**
  * GET /api/auth/verify-email?token=xxx
@@ -42,7 +64,14 @@ export async function GET(request: NextRequest) {
 
     const user = await prisma.user.findFirst({
       where: { verification_token: hashedToken },
-      select: { id: true, email_verified: true, verification_token_expires: true },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        secondary_role: true,
+        email_verified: true,
+        verification_token_expires: true,
+      },
     });
 
     if (!user) {
@@ -75,7 +104,20 @@ export async function GET(request: NextRequest) {
       console.error('Failed to award verification credits:', err);
     }
 
-    return NextResponse.redirect(new URL('/verify-email?status=success', request.url));
+    const sessionToken = await new jose.SignJWT({
+      id: user.id,
+      email: user.email,
+      role: user.role || '',
+      secondary_role: user.secondary_role || null,
+      email_verified: true,
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setExpirationTime('10d')
+      .sign(JWT_SECRET);
+
+    const response = NextResponse.redirect(new URL('/verify-email?status=success', request.url));
+    response.cookies.set('token', sessionToken, getCookieOptions());
+    return response;
   } catch (error) {
     captureError(error, { endpoint: 'GET /api/auth/verify-email', action: 'token_validation' });
     return NextResponse.redirect(new URL('/verify-email?status=error', request.url));
@@ -128,6 +170,14 @@ export async function POST(request: NextRequest) {
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://takeone-nexus.net.in';
     const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}`;
+    const resend = getResendClient();
+
+    if (!resend) {
+      return NextResponse.json(
+        { success: false, message: 'Email service is not configured. Please try again later.' },
+        { status: 503 }
+      );
+    }
 
     await resend.emails.send({
       from: 'TAKE ONE Nexus <noreply@takeone-nexus.net.in>',

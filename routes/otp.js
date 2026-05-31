@@ -1,5 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
 const { authenticateUser } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimiter');
@@ -8,6 +9,34 @@ const { Resend } = require('resend');
 const router = express.Router();
 const prisma = new PrismaClient();
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+function getCookieOptions() {
+  const isProd = process.env.NODE_ENV === 'production';
+  const isVercelPreview = Boolean(process.env.VERCEL_URL?.includes('vercel.app'));
+  return {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'None' : 'Lax',
+    path: '/',
+    maxAge: 10 * 24 * 60 * 60 * 1000,
+    domain: isProd && !isVercelPreview ? '.takeone-nexus.net.in' : undefined
+  };
+}
+
+function createVerifiedSessionToken(reqUser) {
+  const secret = process.env.JWT_SECRET || 'takeone_fallback_secret_32_chars_long';
+  return jwt.sign(
+    {
+      id: reqUser.id,
+      email: reqUser.email,
+      role: reqUser.role || '',
+      secondary_role: reqUser.secondary_role || null,
+      email_verified: true
+    },
+    secret,
+    { expiresIn: '10d' }
+  );
+}
 
 // Rate limiter: max 3 OTP send attempts per 15 minutes per user
 const otpSendLimiter = createRateLimiter({
@@ -214,12 +243,26 @@ router.post('/confirm', authenticateUser, otpConfirmLimiter, async (req, res) =>
       }
     });
 
+    const token = createVerifiedSessionToken(req.user);
+    res.cookie('token', token, getCookieOptions());
+
     // Trigger credit reward for 'verify_email' task (non-blocking)
     triggerCreditTask(userId, 'verify_email').catch(err =>
       console.error('[OTP_CREDIT_TRIGGER_ERROR]', err.message)
     );
 
-    return res.json({ success: true, message: 'Email verified successfully! Credits awarded.' });
+    return res.json({
+      success: true,
+      message: 'Email verified successfully! Credits awarded.',
+      token,
+      user: {
+        id: req.user.id,
+        email: req.user.email,
+        role: req.user.role || '',
+        secondary_role: req.user.secondary_role || null,
+        email_verified: true
+      }
+    });
 
   } catch (error) {
     console.error('[OTP_CONFIRM_ERROR]', error.message);

@@ -598,6 +598,15 @@ export default async function ProfilePage({
         <Script src="/scripts/pages/profile.js" strategy="afterInteractive" />
         <Script id="otp-init" strategy="afterInteractive">{`
           (function () {
+            var globalVerifyBtn = document.getElementById('verifyEmailBtn');
+            if (globalVerifyBtn) {
+              globalVerifyBtn.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                window.dispatchEvent(new CustomEvent('takeone:open-email-verification'));
+              }, true);
+            }
+
             var verifyBtn = document.getElementById('verifyEmailBtn');
             var modal     = document.getElementById('otpModal');
             var closeBtn  = document.getElementById('otpModalClose');

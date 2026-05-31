@@ -1,7 +1,11 @@
 const { Resend } = require('resend');
 const { buildVerifyEmailTemplate, buildResetPasswordTemplate } = require('./email-templates-legacy');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return null;
+  return new Resend(apiKey);
+}
 
 /**
  * Sends a cinematic welcome email to new users.
@@ -15,6 +19,9 @@ async function sendWelcomeEmail(to, name) {
   }
 
   try {
+    const resend = getResendClient();
+    if (!resend) return;
+
     const { data, error } = await resend.emails.send({
       from: 'TAKE ONE NEXUS <onboarding@takeone-nexus.net.in>',
       to: [to],
@@ -142,6 +149,9 @@ async function sendVerificationEmail(to, name, token) {
   const verificationUrl = `${appUrl}/api/auth/verify-email?token=${token}`;
 
   try {
+    const resend = getResendClient();
+    if (!resend) return;
+
     const { data, error } = await resend.emails.send({
       from: 'TAKE ONE NEXUS <auth@takeone-nexus.net.in>',
       to: [to],
@@ -163,6 +173,9 @@ async function sendPasswordResetEmail(to, name, token) {
   const resetUrl = `${appUrl}/reset-password?token=${token}`;
 
   try {
+    const resend = getResendClient();
+    if (!resend) return;
+
     const { data, error } = await resend.emails.send({
       from: 'TAKE ONE NEXUS <security@takeone-nexus.net.in>',
       to: [to],

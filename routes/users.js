@@ -55,7 +55,7 @@ function createToken(user) {
       // secondary_role is critical — requireAdmin/requireSecondaryRole checks this field.
       // Without it, admin subdomain access always fails, causing the redirect loop.
       secondary_role: user.secondary_role || null,
-      email_verified: user.email_verified ?? null
+      email_verified: user.email_verified == null ? null : Boolean(user.email_verified)
     },
     secret,
     { expiresIn: '10d' }
@@ -123,6 +123,7 @@ async function getProfileData(userId) {
 
   return {
     ...userRows[0],
+    email_verified: Boolean(userRows[0].email_verified),
     name: formatDisplayName(userRows[0].name),
     scripts: scriptRows
   };
@@ -194,7 +195,8 @@ router.post('/register', registerLimiter, registerValidation, async (req, res) =
       role: role || '',
       college: college || '',
       city: city || '',
-      gender: gender || 'Prefer not to say'
+      gender: gender || 'Prefer not to say',
+      email_verified: false
     };
 
     const token = createToken(user);
@@ -224,7 +226,8 @@ router.post('/register', registerLimiter, registerValidation, async (req, res) =
         gender: user.gender,
         screen_name: screen_name || null,
         display_preference: display_preference || 'Show Real Name Only',
-        credits: 0
+        credits: 0,
+        email_verified: false
       },
       token: token
     });
@@ -390,7 +393,7 @@ router.post('/login', loginLimiter, loginValidation, async (req, res) => {
         display_preference: user.display_preference || 'Show Real Name Only',
         social_links: user.social_links || null,
         credits: user.credits || 0,
-        email_verified: user.email_verified ?? true
+        email_verified: user.email_verified == null ? true : Boolean(user.email_verified)
       },
       token: token
     });

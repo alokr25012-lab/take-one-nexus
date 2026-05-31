@@ -11,13 +11,10 @@ import { checkRateLimit, getClientIP, buildRateLimitKey } from '@/lib/rate-limit
 import { RATE_LIMITS } from '@/lib/rate-limit-config';
 import { captureError } from '@/lib/sentry';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-// Log if RESEND_API_KEY is configured
-if (!process.env.RESEND_API_KEY) {
-  console.warn('[NEXTJS AUTH] WARNING: RESEND_API_KEY not configured. Password reset emails will not be sent.');
-} else {
-  console.log('[NEXTJS AUTH] RESEND_API_KEY is configured');
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return null;
+  return new Resend(apiKey);
 }
 
 /**
@@ -83,6 +80,12 @@ export async function POST(request: NextRequest) {
       console.error('[NEXTJS AUTH] Cannot send email: RESEND_API_KEY not configured');
     } else {
       try {
+        const resend = getResendClient();
+        if (!resend) {
+          console.error('[NEXTJS AUTH] Cannot send email: RESEND_API_KEY not configured');
+          return NextResponse.json({ success: true, message: 'If this email is registered, a reset link has been sent.' });
+        }
+
         const result = await resend.emails.send({
           from: 'TAKE ONE NEXUS <onboarding@takeone-nexus.net.in>',
           to: user.email,
