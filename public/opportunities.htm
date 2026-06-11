@@ -250,7 +250,7 @@
           const data = await res.json();
 
           if (!data.success) {
-            opportunitiesList.innerHTML = `<div class="empty-state">Error: ${data.message}</div>`;
+            opportunitiesList.innerHTML = `<div class="empty-state">Error: ${escapeHTML(data.message)}</div>`;
             return;
           }
 
@@ -294,25 +294,25 @@
         let actionButtonHtml = '';
         if (currentUser) {
           if (opp.user_id === currentUser.id) {
-            actionButtonHtml = `<button class="btn-primary view-apps-btn" data-id="${opp.id}">View Applications (${opp.applications?.length || 0})</button>`;
+            actionButtonHtml = `<button class="btn-primary view-apps-btn" data-id="${escapeHTML(String(opp.id))}">View Applications (${escapeHTML(String(opp.applications?.length || 0))})</button>`;
           } else {
             const hasApplied = opp.applications?.some(app => app.applicant_id === currentUser.id);
             if (hasApplied) {
               const status = opp.applications.find(app => app.applicant_id === currentUser.id).status;
-              actionButtonHtml = `<button class="btn-secondary" disabled>Applied (${status.toUpperCase()})</button>`;
+              actionButtonHtml = `<button class="btn-secondary" disabled>Applied (${escapeHTML(status.toUpperCase())})</button>`;
             } else {
-              actionButtonHtml = `<button class="btn-primary apply-btn" data-id="${opp.id}">Apply to Board</button>`;
+              actionButtonHtml = `<button class="btn-primary apply-btn" data-id="${escapeHTML(String(opp.id))}">Apply to Board</button>`;
             }
           }
         } else {
-          actionButtonHtml = `<button class="btn-primary apply-btn" data-id="${opp.id}">Apply to Board</button>`;
+          actionButtonHtml = `<button class="btn-primary apply-btn" data-id="${escapeHTML(String(opp.id))}">Apply to Board</button>`;
         }
 
         card.innerHTML = `
           <div class="card-header">
             <div class="poster-meta">
               <div class="poster-avatar" style="background: rgba(255,77,26,0.08); display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--neon);">
-                ${posterName.charAt(0).toUpperCase()}
+                ${escapeHTML(posterName.charAt(0).toUpperCase())}
               </div>
               <div>
                 <div class="poster-name">${escapeHTML(posterName)}</div>
@@ -373,7 +373,7 @@
           <div class="card-header">
             <div class="poster-meta">
               <div class="poster-avatar" style="background: rgba(0,212,255,0.08); display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--cyan);">
-                ${posterName.charAt(0).toUpperCase()}
+                ${escapeHTML(posterName.charAt(0).toUpperCase())}
               </div>
               <div>
                 <div class="poster-name">${escapeHTML(app.opportunity.title)}</div>
@@ -386,7 +386,7 @@
             <strong>Your Pitch:</strong> ${escapeHTML(app.message || 'No message provided.')}
           </div>
           <div class="card-actions">
-            <span class="application-status status-${app.status}">${app.status.toUpperCase()}</span>
+            <span class="application-status status-${escapeHTML(app.status)}">${escapeHTML(app.status.toUpperCase())}</span>
           </div>
         `;
 
@@ -415,12 +415,12 @@
           if (app.status === 'pending') {
             actionsHtml = `
               <div class="application-actions">
-                <button class="btn-accept accept-app-btn" data-id="${app.id}">Accept</button>
-                <button class="btn-reject reject-app-btn" data-id="${app.id}">Reject</button>
+                <button class="btn-accept accept-app-btn" data-id="${escapeHTML(String(app.id))}">Accept</button>
+                <button class="btn-reject reject-app-btn" data-id="${escapeHTML(String(app.id))}">Reject</button>
               </div>
             `;
           } else {
-            actionsHtml = `<span class="application-status status-${app.status}">${app.status.toUpperCase()}</span>`;
+            actionsHtml = `<span class="application-status status-${escapeHTML(app.status)}">${escapeHTML(app.status.toUpperCase())}</span>`;
           }
 
           item.innerHTML = `
