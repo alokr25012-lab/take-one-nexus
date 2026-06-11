@@ -3,14 +3,27 @@ const { authenticateUser, requireVerified } = require('../middleware/auth');
 const prisma = require('../utils/prisma');
 const { createNotification } = require('../utils/notifications');
 const { getCanonicalDisplayName } = require('../utils/formatting');
+const { createRateLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
+
+const opportunitiesWriteLimiter = createRateLimiter({
+  limit: 30, // 30 write actions per 15 minutes
+  windowMs: 15 * 60 * 1000,
+  keyPrefix: 'opportunities-write',
+});
+
+const opportunitiesReadLimiter = createRateLimiter({
+  limit: 100, // 100 read actions per 15 minutes
+  windowMs: 15 * 60 * 1000,
+  keyPrefix: 'opportunities-read',
+});
 
 /**
  * POST /api/opportunities
  * Create a new opportunity (verified users only)
  */
-router.post('/', authenticateUser, requireVerified, async (req, res) => {
+router.post('/', opportunitiesWriteLimiter, authenticateUser, requireVerified, async (req, res) => {
   try {
     const { title, description, roles_needed } = req.body;
     const userId = Number(req.user.id);
@@ -49,7 +62,7 @@ router.post('/', authenticateUser, requireVerified, async (req, res) => {
  * GET /api/opportunities
  * Retrieve all opportunities with search and filter queries
  */
-router.get('/', async (req, res) => {
+router.get('/', opportunitiesReadLimiter, async (req, res) => {
   try {
     const { search, role } = req.query;
 
@@ -108,7 +121,7 @@ router.get('/', async (req, res) => {
  * GET /api/opportunities/my-posts
  * Retrieve opportunities posted by the current user
  */
-router.get('/my-posts', authenticateUser, async (req, res) => {
+router.get('/my-posts', opportunitiesReadLimiter, authenticateUser, async (req, res) => {
   try {
     const userId = Number(req.user.id);
 
@@ -151,7 +164,7 @@ router.get('/my-posts', authenticateUser, async (req, res) => {
  * GET /api/opportunities/my-applications
  * Retrieve applications submitted by the current user
  */
-router.get('/my-applications', authenticateUser, async (req, res) => {
+router.get('/my-applications', opportunitiesReadLimiter, authenticateUser, async (req, res) => {
   try {
     const userId = Number(req.user.id);
 
@@ -193,7 +206,7 @@ router.get('/my-applications', authenticateUser, async (req, res) => {
  * POST /api/opportunities/:id/apply
  * Apply to a specific opportunity
  */
-router.post('/:id/apply', authenticateUser, requireVerified, async (req, res) => {
+router.post('/:id/apply', opportunitiesWriteLimiter, authenticateUser, requireVerified, async (req, res) => {
   try {
     const opportunityId = Number(req.params.id);
     const applicantId = Number(req.user.id);
@@ -278,7 +291,7 @@ router.post('/:id/apply', authenticateUser, requireVerified, async (req, res) =>
  * PATCH /api/opportunities/applications/:id/status
  * Accept or Reject an application (owner of the opportunity only)
  */
-router.patch('/applications/:id/status', authenticateUser, async (req, res) => {
+router.patch('/applications/:id/status', opportunitiesWriteLimiter, authenticateUser, async (req, res) => {
   try {
     const applicationId = Number(req.params.id);
     const { status } = req.body;

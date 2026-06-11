@@ -387,7 +387,7 @@ app.get('/crew', (req, res) => {
   res.redirect(308, '/crew.htm');
 });
 
-app.get('/opportunities', (req, res) => {
+app.get('/opportunities', globalLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'opportunities.htm'));
 });
 
