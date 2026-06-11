@@ -48,6 +48,8 @@ model User {
   availability        String?                @default("Available") @db.VarChar(50)
   community_memberships   CommunityMember[]
   community_subscriptions CommunitySubscription[]
+  invitee_invitations     CommunityInvitation[]  @relation("InviteeInvitations")
+  inviter_invitations     CommunityInvitation[]  @relation("InviterInvitations")
 
   @@index([secondary_role], map: "idx_users_secondary_role")
   @@index([email_verified], map: "idx_users_email_verified")
@@ -362,6 +364,7 @@ model Community {
   members         CommunityMember[]
   groups          CommunityGroup[]
   subscriptions   CommunitySubscription[]
+  invitations     CommunityInvitation[]
 
   @@map("communities")
 }
@@ -438,6 +441,25 @@ model CommunityPricingConfig {
   updated_at        DateTime @default(now()) @updatedAt @db.Timestamp(0)
 
   @@map("community_pricing_configs")
+}
+
+model CommunityInvitation {
+  id              Int          @id @default(autoincrement()) @db.UnsignedInt
+  community_id    Int          @db.UnsignedInt
+  invitee_id      Int          @db.UnsignedInt
+  inviter_id      Int          @db.UnsignedInt
+  status          String       @default("PENDING") @db.VarChar(50)
+  created_at      DateTime     @default(now()) @db.Timestamp(0)
+  updated_at      DateTime     @default(now()) @updatedAt @db.Timestamp(0)
+
+  community       Community    @relation(fields: [community_id], references: [id], onDelete: Cascade)
+  invitee         User         @relation("InviteeInvitations", fields: [invitee_id], references: [id], onDelete: Cascade)
+  inviter         User         @relation("InviterInvitations", fields: [inviter_id], references: [id], onDelete: Cascade)
+
+  @@unique([community_id, invitee_id])
+  @@index([invitee_id])
+  @@index([community_id])
+  @@map("community_invitations")
 }
 
 

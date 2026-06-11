@@ -8,7 +8,7 @@
  * - Authentication failures
  */
 
-const Sentry = require('@sentry/nextjs');
+const Sentry = require('@sentry/node');
 
 let initialized = false;
 

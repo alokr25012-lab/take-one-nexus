@@ -3,6 +3,21 @@
 Welcome to the TAKE ONE Nexus Roadmap! This document outlines our strategic vision for the future of the platform. We are building a cinematic ecosystem, and these features represent the next leap in connecting filmmakers, crew members, and screenwriters.
 
 ---
+# 🗺️ Feature Roadmap
+
+Welcome to the TAKE ONE Nexus Roadmap! This document outlines our strategic vision for the future of the platform. We are building a cinematic ecosystem, and these features represent the next leap in connecting filmmakers, crew members, and screenwriters.
+
+---
+
+## 📑 Table of Contents
+
+- [🟢 Phase 1: Foundation](#-phase-1-foundation-completed)
+- [🟡 Phase 2: Production Hardening & Decoupling](#-phase-2-production-hardening--decoupling-completed)
+- [🔵 Phase 3: The AI Production Board](#-phase-3-the-ai-production-board-upcoming)
+- [🟣 Phase 4: Expansion & Ecosystem](#-phase-4-expansion--ecosystem)
+- [🌐 Open Source Programs](#-open-source-programs)
+
+---
 
 ## 🟢 Phase 1: Foundation (Completed)
 - [x] Basic user registration and profile creation

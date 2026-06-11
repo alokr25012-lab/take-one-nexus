@@ -225,8 +225,8 @@
       return false;
     }
 
-    if (!password.value || password.value.length < 6) {
-      showValidationMessage(password, 'Password must be at least 6 characters.');
+    if (!password.value || password.value.length < 8) {
+      showValidationMessage(password, 'Password must be at least 8 characters.');
       return false;
     }
 

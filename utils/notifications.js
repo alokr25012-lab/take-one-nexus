@@ -22,6 +22,7 @@ async function ensureNotificationsTable() {
         ON UPDATE CASCADE
     )
   `);
+  tableEnsured = true;
 }
 
 async function createNotification({ userId, type, title, body = null, linkUrl = null }) {

@@ -1,7 +1,7 @@
 const express = require('express');
 const { pool } = require('../config/db');
 const { authenticateUser, requireRole } = require('../middleware/auth');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../utils/prisma');
 const {
   getEmailStatus,
   sendSmtpTestEmail,
@@ -9,7 +9,7 @@ const {
 } = require('../config/mailer');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+
 
 // NOTE: Pusher instance was removed from this file as it is not utilized 
 // within the email, stats, or analytics administration routers.

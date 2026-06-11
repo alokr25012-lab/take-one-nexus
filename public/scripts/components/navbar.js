@@ -63,7 +63,7 @@ const Navbar = {
         if (user && user.role) {
             const role = user.role.toLowerCase();
             if (role === 'admin' || role === 'developer' || role === 'moderator') {
-                html += `<a href="/admin" style="color: var(--neon); font-weight: bold;">Admin Panel</a>`;
+                html += `<a href="https://admin.takeone-nexus.net.in" style="color: var(--neon); font-weight: bold;">Admin Panel</a>`;
             }
         }
 

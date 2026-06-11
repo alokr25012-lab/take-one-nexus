@@ -2,11 +2,11 @@ const express = require('express');
 const { authenticateUser } = require('../middleware/auth');
 const { body, param, query } = require('express-validator');
 const { validateRequest } = require('../middleware/validator');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../utils/prisma');
 const Pusher = require('pusher');
 const { formatDisplayName } = require('../utils/formatting');
 
-const prisma = new PrismaClient();
+
 const router = express.Router();
 
 // Configure Pusher

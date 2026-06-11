@@ -1,12 +1,12 @@
 const express = require('express');
 const crypto = require('crypto');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../utils/prisma');
 const { authenticateUser } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimiter');
 const { Resend } = require('resend');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Rate limiter: max 3 OTP send attempts per 15 minutes per user

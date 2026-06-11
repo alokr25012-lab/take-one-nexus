@@ -1,9 +1,9 @@
 const express = require('express');
 const crypto = require('crypto');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../utils/prisma');
 const Pusher = require('pusher');
 
-const prisma = new PrismaClient();
+
 const router = express.Router();
 
 // Configure Pusher

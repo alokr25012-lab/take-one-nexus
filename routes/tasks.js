@@ -3,10 +3,10 @@ const { authenticateUser, requireVerified, requireAdmin } = require('../middlewa
 const { body, param } = require('express-validator');
 const { validateRequest } = require('../middleware/validator');
 const { createRateLimiter } = require('../middleware/rateLimiter');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../utils/prisma');
 const Pusher = require('pusher');
 
-const prisma = new PrismaClient();
+
 const router = express.Router();
 
 const taskLimiter = createRateLimiter({

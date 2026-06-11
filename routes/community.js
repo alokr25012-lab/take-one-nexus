@@ -2,13 +2,21 @@ const express = require('express');
 const { authenticateUser, requireAdmin } = require('../middleware/auth');
 const { body, param, query } = require('express-validator');
 const { validateRequest } = require('../middleware/validator');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../utils/prisma');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { captureError } = require('../src/lib/sentry');
+const { uploadLogo } = require('../middleware/upload');
+const { createRateLimiter } = require('../middleware/rateLimiter');
 
-const prisma = new PrismaClient();
+const inviteLimiter = createRateLimiter({
+  limit: 20,
+  windowMs: 15 * 60 * 1000,
+  keyPrefix: 'community-invite'
+});
+
+
 const router = express.Router();
 
 function logTransaction(details) {
@@ -42,15 +50,19 @@ router.get('/pricing-configs', authenticateUser, async (req, res) => {
 
 /**
  * GET /api/community/my-community
- * Get current user's community if they are a member/owner
+ * Get current user's communities if they are a member/owner
  */
 router.get('/my-community', authenticateUser, async (req, res) => {
   try {
     const userId = Number(req.user.id);
+    const communityId = req.query.communityId ? Number(req.query.communityId) : null;
     
-    // Find membership
-    const memberRecord = await prisma.communityMember.findFirst({
-      where: { user_id: userId },
+    // Find all memberships
+    const memberRecords = await prisma.communityMember.findMany({
+      where: { 
+        user_id: userId,
+        ...(communityId ? { community_id: communityId } : {})
+      },
       include: {
         community: {
           include: {
@@ -62,7 +74,8 @@ router.get('/my-community', authenticateUser, async (req, res) => {
                     name: true,
                     email: true,
                     role: true,
-                    avatar_url: true
+                    avatar_url: true,
+                    screen_name: true
                   }
                 }
               }
@@ -77,15 +90,20 @@ router.get('/my-community', authenticateUser, async (req, res) => {
       }
     });
 
-    if (!memberRecord) {
-      return res.json({ success: true, inCommunity: false });
+    if (memberRecords.length === 0) {
+      return res.json({ success: true, inCommunity: false, communities: [] });
     }
 
     res.json({
       success: true,
       inCommunity: true,
-      role: memberRecord.role,
-      community: memberRecord.community
+      communities: memberRecords.map(r => ({
+        ...r.community,
+        role: r.role
+      })),
+      // Backward compatibility:
+      role: memberRecords[0].role,
+      community: memberRecords[0].community
     });
   } catch (error) {
     console.error('[Community] Get my community error:', error.message);
@@ -107,18 +125,6 @@ router.post('/create-order', authenticateUser, createOrderValidation, async (req
   try {
     const userId = Number(req.user.id);
     const { planType, memberCount } = req.body;
-
-    // Check if user is already in a community
-    const existingMembership = await prisma.communityMember.findFirst({
-      where: { user_id: userId }
-    });
-
-    if (existingMembership) {
-      return res.status(400).json({
-        success: false,
-        message: 'You are already a member of a community.'
-      });
-    }
 
     const config = await prisma.communityPricingConfig.findUnique({
       where: { plan_type: planType }
@@ -377,18 +383,6 @@ router.post('/instantiate', authenticateUser, instantiateValidation, async (req,
     const userId = Number(req.user.id);
     const { razorpay_order_id, name, description } = req.body;
 
-    // Check if user is already in a community
-    const existingMembership = await prisma.communityMember.findFirst({
-      where: { user_id: userId }
-    });
-
-    if (existingMembership) {
-      return res.status(400).json({
-        success: false,
-        message: 'You are already a member of a community.'
-      });
-    }
-
     const subscription = await prisma.communitySubscription.findFirst({
       where: {
         razorpay_order_id,
@@ -490,11 +484,13 @@ router.post('/instantiate', authenticateUser, instantiateValidation, async (req,
 router.get('/dashboard', authenticateUser, async (req, res) => {
   try {
     const userId = Number(req.user.id);
+    const communityId = req.query.communityId ? Number(req.query.communityId) : undefined;
 
     // Find the community where user is owner or moderator
     const membership = await prisma.communityMember.findFirst({
       where: {
         user_id: userId,
+        ...(communityId ? { community_id: communityId } : {}),
         role: { in: ['Owner', 'Moderator'] }
       },
       include: {
@@ -583,26 +579,28 @@ router.get('/members', authenticateUser, async (req, res) => {
  * Invite a user by email to join the community (Owner/Moderator only)
  */
 const inviteMemberValidation = [
-  body('email').isEmail().withMessage('Valid email is required'),
+  body('userId').isInt().withMessage('Valid user ID is required'),
+  body('communityId').isInt().withMessage('Valid community ID is required'),
   validateRequest
 ];
 
-router.post('/members/invite', authenticateUser, inviteMemberValidation, async (req, res) => {
+router.post('/members/invite', authenticateUser, inviteLimiter, inviteMemberValidation, async (req, res) => {
   try {
     const callerId = Number(req.user.id);
-    const { email } = req.body;
+    const userId = Number(req.body.userId);
+    const communityId = Number(req.body.communityId);
 
-    // Verify caller is Owner or Moderator
+    // Verify caller is Owner or Moderator of this specific community
     const myMembership = await prisma.communityMember.findFirst({
       where: {
         user_id: callerId,
+        community_id: communityId,
         role: { in: ['Owner', 'Moderator'] }
       },
       include: {
         community: {
           include: {
-            members: true,
-            groups: true
+            members: true
           }
         }
       }
@@ -624,44 +622,225 @@ router.post('/members/invite', authenticateUser, inviteMemberValidation, async (
 
     // Find invitee user
     const targetUser = await prisma.user.findUnique({
-      where: { email }
+      where: { id: userId }
     });
 
     if (!targetUser) {
-      return res.status(404).json({ success: false, message: 'Crew member with this email not found' });
+      return res.status(404).json({ success: false, message: 'Crew member not found' });
     }
 
-    // Check if user is already in a community
+    // Check if user is already in this community
     const targetMembership = await prisma.communityMember.findFirst({
-      where: { user_id: targetUser.id }
+      where: {
+        user_id: targetUser.id,
+        community_id: communityId
+      }
     });
 
     if (targetMembership) {
       return res.status(400).json({
         success: false,
-        message: 'This crew member is already a member of a community.'
+        message: 'This crew member is already a member of this community.'
       });
     }
 
-    // Add member to community & General group in transaction
+    // Check if there is already a PENDING invitation
+    const existingInvitation = await prisma.communityInvitation.findFirst({
+      where: {
+        community_id: communityId,
+        invitee_id: targetUser.id,
+        status: 'PENDING'
+      }
+    });
+
+    if (existingInvitation) {
+      return res.status(400).json({
+        success: false,
+        message: 'An invitation is already pending for this crew member.'
+      });
+    }
+
+    // Create the invitation
+    await prisma.communityInvitation.create({
+      data: {
+        community_id: communityId,
+        invitee_id: targetUser.id,
+        inviter_id: callerId,
+        status: 'PENDING'
+      }
+    });
+
+    // Send notification email via Resend
+    if (process.env.RESEND_API_KEY) {
+      try {
+        const { Resend } = require('resend');
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        
+        const callerUser = await prisma.user.findUnique({
+          where: { id: callerId },
+          select: { name: true }
+        });
+        const inviterName = callerUser ? callerUser.name : 'A crew leader';
+
+        await resend.emails.send({
+          from: 'TAKE ONE NEXUS <community@takeone-nexus.net.in>',
+          to: [targetUser.email],
+          subject: `INVITATION: Join ${community.name} on TAKE ONE NEXUS`,
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+                body { background-color: #06080a; color: #e0e0e0; font-family: 'Space Mono', monospace; margin: 0; padding: 0; }
+                .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; border: 1px solid #00D4FF; background: linear-gradient(180deg, #0e1218 0%, #06080a 100%); }
+                .header { text-align: center; padding-bottom: 30px; border-bottom: 1px solid rgba(0, 212, 255, 0.2); }
+                .logo { font-size: 32px; font-weight: 700; letter-spacing: 0.2em; color: #ffffff; }
+                .logo span { color: #00D4FF; }
+                .content { padding: 30px 0; line-height: 1.6; }
+                .greeting { font-size: 18px; color: #00D4FF; margin-bottom: 20px; }
+                .cta-wrap { text-align: center; margin: 40px 0; }
+                .cta { background-color: #00D4FF; color: #06080a !important; padding: 15px 30px; text-decoration: none; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; display: inline-block; border-radius: 4px; }
+                .footer { font-size: 10px; color: #888888; text-align: center; padding-top: 30px; border-top: 1px solid rgba(0, 212, 255, 0.1); }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <div class="logo">TAKE <span>ONE</span></div>
+                </div>
+                <div class="content">
+                  <div class="greeting">COMMUNITY INVITE: ${community.name}</div>
+                  <p>Hi ${targetUser.name},</p>
+                  <p>You have been invited by <strong>${inviterName}</strong> to join the community <strong>${community.name}</strong> on the TAKE ONE platform.</p>
+                  <p>Accept this invitation to unlock shared chat spaces, crew call listings, and collaborative tools for this community.</p>
+                  <div class="cta-wrap">
+                    <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/chat" class="cta">Accept Invitation</a>
+                  </div>
+                </div>
+                <div class="footer">
+                  © 2026 TAKE ONE NEXUS. ALL RIGHTS RESERVED.
+                </div>
+              </div>
+            </body>
+            </html>
+          `
+        });
+      } catch (emailErr) {
+        console.error('[Community] Failed to send invitation email:', emailErr.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Invitation successfully sent to ${targetUser.name}.`
+    });
+  } catch (error) {
+    console.error('[Community] Invite member error:', error.message);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/community/invitations/my-invitations
+ * Get pending invitations for logged-in user
+ */
+router.get('/invitations/my-invitations', authenticateUser, async (req, res) => {
+  try {
+    const userId = Number(req.user.id);
+    const invitations = await prisma.communityInvitation.findMany({
+      where: {
+        invitee_id: userId,
+        status: 'PENDING'
+      },
+      include: {
+        community: true,
+        inviter: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            avatar_url: true,
+            screen_name: true
+          }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      invitations
+    });
+  } catch (error) {
+    console.error('[Community] Get my invitations error:', error.message);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/community/invitations/:id/accept
+ * Accept a community invitation
+ */
+router.post('/invitations/:id/accept', authenticateUser, async (req, res) => {
+  try {
+    const invitationId = Number(req.params.id);
+    const userId = Number(req.user.id);
+
+    const invitation = await prisma.communityInvitation.findFirst({
+      where: {
+        id: invitationId,
+        invitee_id: userId,
+        status: 'PENDING'
+      },
+      include: {
+        community: {
+          include: {
+            members: true,
+            groups: true
+          }
+        }
+      }
+    });
+
+    if (!invitation) {
+      return res.status(404).json({ success: false, message: 'Invitation not found or already processed.' });
+    }
+
+    const { community } = invitation;
+
+    // Check capacity
+    if (community.members.length >= community.max_members) {
+      return res.status(400).json({
+        success: false,
+        message: `Community membership limit reached (${community.max_members} max).`
+      });
+    }
+
     const generalGroup = community.groups.find(g => g.name === 'General');
 
     await prisma.$transaction(async (tx) => {
-      // Add CommunityMember record
+      // 1. Update invitation status to ACCEPTED
+      await tx.communityInvitation.update({
+        where: { id: invitationId },
+        data: { status: 'ACCEPTED' }
+      });
+
+      // 2. Add CommunityMember record
       await tx.communityMember.create({
         data: {
           community_id: community.id,
-          user_id: targetUser.id,
+          user_id: userId,
           role: 'Member'
         }
       });
 
-      // Add to General Conversation
+      // 3. Add to General conversation
       if (generalGroup) {
         await tx.conversationMember.create({
           data: {
             conversation_id: generalGroup.conversation_id,
-            user_id: targetUser.id,
+            user_id: userId,
             role: 'Member'
           }
         });
@@ -670,12 +849,110 @@ router.post('/members/invite', authenticateUser, inviteMemberValidation, async (
 
     res.json({
       success: true,
-      message: `${targetUser.name} has been added to the community.`
+      message: `You have successfully joined ${community.name}.`
     });
   } catch (error) {
-    console.error('[Community] Invite member error:', error.message);
+    console.error('[Community] Accept invitation error:', error.message);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
+});
+
+/**
+ * POST /api/community/invitations/:id/reject
+ * Reject a community invitation
+ */
+router.post('/invitations/:id/reject', authenticateUser, async (req, res) => {
+  try {
+    const invitationId = Number(req.params.id);
+    const userId = Number(req.user.id);
+
+    const invitation = await prisma.communityInvitation.findFirst({
+      where: {
+        id: invitationId,
+        invitee_id: userId,
+        status: 'PENDING'
+      }
+    });
+
+    if (!invitation) {
+      return res.status(404).json({ success: false, message: 'Invitation not found or already processed.' });
+    }
+
+    await prisma.communityInvitation.update({
+      where: { id: invitationId },
+      data: { status: 'REJECTED' }
+    });
+
+    res.json({
+      success: true,
+      message: 'Invitation rejected.'
+    });
+  } catch (error) {
+    console.error('[Community] Reject invitation error:', error.message);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/community/logo
+ * Local file logo upload
+ */
+router.post('/logo', authenticateUser, (req, res) => {
+  uploadLogo.single('logo')(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: 'No file uploaded' });
+      }
+
+      const communityId = Number(req.body.communityId || req.body.community_id);
+      if (!communityId) {
+        // Delete uploaded file if ID is missing
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+        return res.status(400).json({ success: false, message: 'Community ID is required' });
+      }
+
+      // Verify caller is Owner or Moderator
+      const membership = await prisma.communityMember.findFirst({
+        where: {
+          user_id: Number(req.user.id),
+          community_id: communityId,
+          role: { in: ['Owner', 'Moderator'] }
+        }
+      });
+
+      if (!membership) {
+        // Delete uploaded file if unauthorized
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+        return res.status(403).json({ success: false, message: 'Access denied: Community Management permissions required' });
+      }
+
+      const logoUrl = `/assets/uploads/logos/${req.file.filename}`;
+      await prisma.community.update({
+        where: { id: communityId },
+        data: { logo_url: logoUrl }
+      });
+
+      res.json({
+        success: true,
+        logo_url: logoUrl,
+        message: 'Community logo uploaded successfully.'
+      });
+    } catch (error) {
+      console.error('[Community] Logo upload error:', error.message);
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  });
 });
 
 /**

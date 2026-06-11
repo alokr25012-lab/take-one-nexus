@@ -1670,8 +1670,8 @@ registerForm?.addEventListener('submit', async (e) => {
     return;
   }
   
-  if (password.length < 6) {
-    showToast('❌ Password must be at least 6 characters');
+  if (password.length < 8) {
+    showToast('❌ Password must be at least 8 characters');
     return;
   }
   // The final step's submit button uses .wizard-btn-next[type="submit"], not .form-submit
@@ -1881,7 +1881,7 @@ function applyRoleBasedUI(user) {
       if (!adminLink && nav) {
         adminLink = document.createElement('a');
         adminLink.id = 'adminPanelLink';
-        adminLink.href = '/admin';
+        adminLink.href = 'https://admin.takeone-nexus.net.in';
         adminLink.textContent = 'Admin Panel';
         adminLink.style.color = 'var(--neon)';
         adminLink.style.fontWeight = 'bold';
