@@ -81,6 +81,7 @@ try {
   const creditsRoutes = require('./routes/credits');
   const paymentRoutes = require('./routes/payments');
   const communityRoutes = require('./routes/community');
+  const opportunityRoutes = require('./routes/opportunities');
 
 const PORT = process.env.PORT || 3000;
 
@@ -230,6 +231,7 @@ app.use('/api/payments', paymentRateLimiter, paymentRoutes);
 app.use('/api/community/create-order', paymentRateLimiter);
 app.use('/api/community/verify-payment', paymentRateLimiter);
 app.use('/api/community', communityRoutes);
+app.use('/api/opportunities', opportunityRoutes);
 
 app.post('/api/groups/create', (req, res) => {
   res.status(403).json({
@@ -383,6 +385,10 @@ app.get('/project', (req, res) => {
 
 app.get('/crew', (req, res) => {
   res.redirect(308, '/crew.htm');
+});
+
+app.get('/opportunities', globalLimiter, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'opportunities.htm'));
 });
 
 app.get('/legal', (req, res) => {

@@ -51,6 +51,7 @@ export default async function LeaderboardPage() {
         <nav>
           <a href="/#explore">Discover Projects</a>
           <a href="/crew">Find Crew</a>
+          <a href="/opportunities">Opportunities</a>
           <a href="/leaderboard" className="active">Leaderboard</a>
           <a href="/#upload">Share Your Script</a>
           <a href="/profile">Profile</a>

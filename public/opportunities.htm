@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Film Opportunity Board | Take One Nexus</title>
+  <meta name="description" content="Discover film project openings, post crew requirements, and connect with creative directors and team members." />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,300;1,300;1,400&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/styles/pages/opportunities.css">
+  <link rel="stylesheet" href="/styles/components/global-chat-fab.css">
+</head>
+
+<body>
+  <!-- ── HEADER ── -->
+  <header>
+    <a href="/" class="logo">TAKE <span>ONE</span></a>
+    <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+    <nav>
+      <a href="/#explore">Discover Projects</a>
+      <a href="/crew">Find Crew</a>
+      <a href="/opportunities" class="active">Opportunities</a>
+      <a href="/leaderboard">Leaderboard</a>
+      <a href="/#upload">Share Your Script</a>
+      <a href="/profile">Profile</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="board-hero">
+      <div class="hero-text">
+        <h1>Film Opportunity Board</h1>
+        <p>Post crew calls, list production openings, or discover opportunities to join dynamic film sets.</p>
+      </div>
+      <div class="board-actions">
+        <button class="btn-primary" id="openPostModalBtn">Post Opportunity</button>
+      </div>
+    </section>
+
+    <!-- Tab navigation -->
+    <div class="tab-nav">
+      <button class="tab-nav-btn active" id="tabAll">All Opportunities</button>
+      <button class="tab-nav-btn" id="tabMyPosts">My Posts</button>
+      <button class="tab-nav-btn" id="tabMyApplications">My Applications</button>
+    </div>
+
+    <section class="board-shell">
+      <aside class="filter-panel" id="filterPanel">
+        <div class="filter-title">Filters</div>
+        <input type="text" id="searchInput" class="search-input" placeholder="Search keywords...">
+        <select id="roleSelect" class="role-select">
+          <option value="">All Roles</option>
+          <option value="Director">Director</option>
+          <option value="Cinematographer">Cinematographer / DP</option>
+          <option value="Writer">Writer</option>
+          <option value="Editor">Editor</option>
+          <option value="Sound">Sound Designer</option>
+          <option value="Actor">Actor</option>
+          <option value="Producer">Producer</option>
+          <option value="Lighting">Lighting / Gaffer</option>
+          <option value="Art">Art Director / Production Design</option>
+          <option value="Support">Set Support / Crew</option>
+        </select>
+        <button class="btn-secondary" style="width: 100%;" id="clearFiltersBtn">Clear Filters</button>
+      </aside>
+
+      <section class="results-panel">
+        <div class="opportunities-list" id="opportunitiesList">
+          <div class="empty-state">Loading opportunities...</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <!-- ── POST OPPORTUNITY MODAL ── -->
+  <div id="postModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">POST OPPORTUNITY</h2>
+        <button class="modal-close" id="closePostModalBtn">&times;</button>
+      </div>
+      <form id="postOpportunityForm">
+        <div class="form-group">
+          <label for="postTitle">Opportunity Title</label>
+          <input type="text" id="postTitle" placeholder="e.g. DP Needed for Sci-Fi Short" required>
+        </div>
+        <div class="form-group">
+          <label for="postRoles">Required Roles (comma-separated)</label>
+          <input type="text" id="postRoles" placeholder="e.g. Cinematographer, Camera Assistant" required>
+        </div>
+        <div class="form-group">
+          <label for="postDesc">Project Description & Requirements</label>
+          <textarea id="postDesc" rows="6" placeholder="Provide details about the shoot dates, style, location, and requirements..." required></textarea>
+        </div>
+        <button type="submit" class="btn-primary" style="width: 100%;">Submit Post →</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── APPLY MODAL ── -->
+  <div id="applyModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">APPLY FOR ROLE</h2>
+        <button class="modal-close" id="closeApplyModalBtn">&times;</button>
+      </div>
+      <form id="applyForm">
+        <input type="hidden" id="applyOppId">
+        <div class="form-group">
+          <label for="applyMessage">Message / Pitch (Optional)</label>
+          <textarea id="applyMessage" rows="5" placeholder="Tell the creator why you're a great fit for this project..."></textarea>
+        </div>
+        <button type="submit" class="btn-primary" style="width: 100%;">Send Application →</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── VIEW APPLICATIONS MODAL (For Post Owner) ── -->
+  <div id="viewAppsModal" class="modal">
+    <div class="modal-content" style="max-width: 700px;">
+      <div class="modal-header">
+        <h2 class="modal-title">APPLICATIONS</h2>
+        <button class="modal-close" id="closeViewAppsModalBtn">&times;</button>
+      </div>
+      <div id="appsListContainer">
+        <div class="empty-state">Loading applications...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared Utility Scripts -->
+  <script src="/scripts/api/api.js" defer></script>
+  <script src="/scripts/utils/helpers.js" defer></script>
+  <script src="/scripts/components/navbar.js" defer></script>
+  <script src="/scripts/components/global-chat-fab.js" defer></script>
+
+  <!-- Core Page Logic -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Elements
+      const openPostModalBtn = document.getElementById('openPostModalBtn');
+      const postModal = document.getElementById('postModal');
+      const closePostModalBtn = document.getElementById('closePostModalBtn');
+      const postOpportunityForm = document.getElementById('postOpportunityForm');
+
+      const applyModal = document.getElementById('applyModal');
+      const closeApplyModalBtn = document.getElementById('closeApplyModalBtn');
+      const applyForm = document.getElementById('applyForm');
+
+      const viewAppsModal = document.getElementById('viewAppsModal');
+      const closeViewAppsModalBtn = document.getElementById('closeViewAppsModalBtn');
+      const appsListContainer = document.getElementById('appsListContainer');
+
+      const tabAll = document.getElementById('tabAll');
+      const tabMyPosts = document.getElementById('tabMyPosts');
+      const tabMyApplications = document.getElementById('tabMyApplications');
+
+      const filterPanel = document.getElementById('filterPanel');
+      const searchInput = document.getElementById('searchInput');
+      const roleSelect = document.getElementById('roleSelect');
+      const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+      const opportunitiesList = document.getElementById('opportunitiesList');
+
+      let currentTab = 'all'; // 'all', 'my-posts', 'my-applications'
+      let currentUser = null;
+
+      // Fetch user profile to check authentication
+      async function checkAuth() {
+        try {
+          const res = await fetch('/api/users/profile');
+          const data = await res.json();
+          if (data.success) {
+            currentUser = data.user;
+          }
+        } catch (e) {
+          console.error('Auth verification failed', e);
+        }
+      }
+
+      // Modals toggling
+      openPostModalBtn.addEventListener('click', () => {
+        if (!currentUser) {
+          alert('You must log in to post an opportunity.');
+          window.location.href = '/?auth=login';
+          return;
+        }
+        postModal.classList.add('show');
+      });
+
+      closePostModalBtn.addEventListener('click', () => postModal.classList.remove('show'));
+      closeApplyModalBtn.addEventListener('click', () => applyModal.classList.remove('show'));
+      closeViewAppsModalBtn.addEventListener('click', () => viewAppsModal.classList.remove('show'));
+
+      // Tabs selection
+      tabAll.addEventListener('click', () => switchTab('all'));
+      tabMyPosts.addEventListener('click', () => switchTab('my-posts'));
+      tabMyApplications.addEventListener('click', () => switchTab('my-applications'));
+
+      function switchTab(tab) {
+        currentTab = tab;
+        tabAll.classList.toggle('active', tab === 'all');
+        tabMyPosts.classList.toggle('active', tab === 'my-posts');
+        tabMyApplications.classList.toggle('active', tab === 'my-applications');
+
+        // Hide filters on custom tabs
+        if (tab === 'all') {
+          filterPanel.style.display = 'block';
+        } else {
+          filterPanel.style.display = 'none';
+        }
+
+        loadData();
+      }
+
+      // Filters
+      searchInput.addEventListener('input', debounce(loadData, 300));
+      roleSelect.addEventListener('change', loadData);
+      clearFiltersBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        roleSelect.value = '';
+        loadData();
+      });
+
+      // Load board content
+      async function loadData() {
+        opportunitiesList.innerHTML = '<div class="empty-state">Loading...</div>';
+
+        try {
+          let url = '/api/opportunities';
+          if (currentTab === 'my-posts') {
+            url = '/api/opportunities/my-posts';
+          } else if (currentTab === 'my-applications') {
+            url = '/api/opportunities/my-applications';
+          } else {
+            const params = new URLSearchParams();
+            if (searchInput.value) params.append('search', searchInput.value);
+            if (roleSelect.value) params.append('role', roleSelect.value);
+            url += '?' + params.toString();
+          }
+
+          const res = await fetch(url);
+          const data = await res.json();
+
+          if (!data.success) {
+            opportunitiesList.innerHTML = `<div class="empty-state">Error: ${escapeHTML(data.message)}</div>`;
+            return;
+          }
+
+          if (data.data.length === 0) {
+            opportunitiesList.innerHTML = '<div class="empty-state">No opportunities found matching this criteria.</div>';
+            return;
+          }
+
+          opportunitiesList.innerHTML = '';
+          data.data.forEach(item => {
+            if (currentTab === 'my-applications') {
+              opportunitiesList.appendChild(createApplicationCard(item));
+            } else {
+              opportunitiesList.appendChild(createOpportunityCard(item));
+            }
+          });
+
+        } catch (err) {
+          opportunitiesList.innerHTML = '<div class="empty-state">Failed to fetch opportunities.</div>';
+        }
+      }
+
+      function createOpportunityCard(opp) {
+        const card = document.createElement('div');
+        card.className = 'opportunity-card';
+
+        const posterName = opp.user.display_preference === 'screen_name' && opp.user.screen_name 
+          ? opp.user.screen_name 
+          : opp.user.name;
+
+        const dateStr = new Date(opp.created_at).toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+
+        // Badges for roles
+        const roles = opp.roles_needed.split(',').map(r => r.trim()).filter(Boolean);
+        const rolesHtml = roles.map(r => `<span class="role-badge">${escapeHTML(r)}</span>`).join('');
+
+        let actionButtonHtml = '';
+        if (currentUser) {
+          if (opp.user_id === currentUser.id) {
+            actionButtonHtml = `<button class="btn-primary view-apps-btn" data-id="${escapeHTML(String(opp.id))}">View Applications (${escapeHTML(String(opp.applications?.length || 0))})</button>`;
+          } else {
+            const hasApplied = opp.applications?.some(app => app.applicant_id === currentUser.id);
+            if (hasApplied) {
+              const status = opp.applications.find(app => app.applicant_id === currentUser.id).status;
+              actionButtonHtml = `<button class="btn-secondary" disabled>Applied (${escapeHTML(status.toUpperCase())})</button>`;
+            } else {
+              actionButtonHtml = `<button class="btn-primary apply-btn" data-id="${escapeHTML(String(opp.id))}">Apply to Board</button>`;
+            }
+          }
+        } else {
+          actionButtonHtml = `<button class="btn-primary apply-btn" data-id="${escapeHTML(String(opp.id))}">Apply to Board</button>`;
+        }
+
+        card.innerHTML = `
+          <div class="card-header">
+            <div class="poster-meta">
+              <div class="poster-avatar" style="background: rgba(255,77,26,0.08); display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--neon);">
+                ${escapeHTML(posterName.charAt(0).toUpperCase())}
+              </div>
+              <div>
+                <div class="poster-name">${escapeHTML(posterName)}</div>
+                <div class="poster-role">${escapeHTML(opp.user.role || 'Creator')}</div>
+              </div>
+            </div>
+            <div class="post-date">${dateStr}</div>
+          </div>
+          <h3 class="opportunity-title">${escapeHTML(opp.title)}</h3>
+          <div class="opportunity-desc">${escapeHTML(opp.description)}</div>
+          <div class="roles-needed-section">
+            ${rolesHtml}
+          </div>
+          <div class="card-actions">
+            ${actionButtonHtml}
+          </div>
+        `;
+
+        // Apply click event
+        const applyBtn = card.querySelector('.apply-btn');
+        if (applyBtn) {
+          applyBtn.addEventListener('click', () => {
+            if (!currentUser) {
+              alert('Please log in to apply.');
+              window.location.href = '/?auth=login';
+              return;
+            }
+            document.getElementById('applyOppId').value = opp.id;
+            applyModal.classList.add('show');
+          });
+        }
+
+        // View apps click event
+        const viewAppsBtn = card.querySelector('.view-apps-btn');
+        if (viewAppsBtn) {
+          viewAppsBtn.addEventListener('click', () => {
+            loadApplications(opp.id, opp.applications);
+          });
+        }
+
+        return card;
+      }
+
+      function createApplicationCard(app) {
+        const card = document.createElement('div');
+        card.className = 'opportunity-card';
+
+        const posterName = app.opportunity.user.display_preference === 'screen_name' && app.opportunity.user.screen_name 
+          ? app.opportunity.user.screen_name 
+          : app.opportunity.user.name;
+
+        const dateStr = new Date(app.created_at).toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric'
+        });
+
+        card.innerHTML = `
+          <div class="card-header">
+            <div class="poster-meta">
+              <div class="poster-avatar" style="background: rgba(0,212,255,0.08); display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--cyan);">
+                ${escapeHTML(posterName.charAt(0).toUpperCase())}
+              </div>
+              <div>
+                <div class="poster-name">${escapeHTML(app.opportunity.title)}</div>
+                <div class="poster-role">Posted by ${escapeHTML(posterName)}</div>
+              </div>
+            </div>
+            <div class="post-date">Applied ${dateStr}</div>
+          </div>
+          <div class="opportunity-desc" style="margin-bottom: 12px;">
+            <strong>Your Pitch:</strong> ${escapeHTML(app.message || 'No message provided.')}
+          </div>
+          <div class="card-actions">
+            <span class="application-status status-${escapeHTML(app.status)}">${escapeHTML(app.status.toUpperCase())}</span>
+          </div>
+        `;
+
+        return card;
+      }
+
+      // Load applicant entries
+      function loadApplications(oppId, applications) {
+        viewAppsModal.classList.add('show');
+        appsListContainer.innerHTML = '';
+
+        if (!applications || applications.length === 0) {
+          appsListContainer.innerHTML = '<div class="empty-state">No applications received yet.</div>';
+          return;
+        }
+
+        applications.forEach(app => {
+          const item = document.createElement('div');
+          item.className = 'application-item';
+
+          const appName = app.applicant.display_preference === 'screen_name' && app.applicant.screen_name
+            ? app.applicant.screen_name
+            : app.applicant.name;
+
+          let actionsHtml = '';
+          if (app.status === 'pending') {
+            actionsHtml = `
+              <div class="application-actions">
+                <button class="btn-accept accept-app-btn" data-id="${escapeHTML(String(app.id))}">Accept</button>
+                <button class="btn-reject reject-app-btn" data-id="${escapeHTML(String(app.id))}">Reject</button>
+              </div>
+            `;
+          } else {
+            actionsHtml = `<span class="application-status status-${escapeHTML(app.status)}">${escapeHTML(app.status.toUpperCase())}</span>`;
+          }
+
+          item.innerHTML = `
+            <div class="applicant-info">
+              <div class="applicant-details">
+                <h4>${escapeHTML(appName)}</h4>
+                <p>Role: ${escapeHTML(app.applicant.role || 'Crew')}</p>
+                <p style="margin-top: 4px; color: var(--cream); font-style: italic;">"${escapeHTML(app.message || 'No pitch statement.')}"</p>
+              </div>
+            </div>
+            ${actionsHtml}
+          `;
+
+          // Bind accept/reject actions
+          const acceptBtn = item.querySelector('.accept-app-btn');
+          if (acceptBtn) {
+            acceptBtn.addEventListener('click', async () => {
+              await updateAppStatus(oppId, app.id, 'accepted');
+            });
+          }
+
+          const rejectBtn = item.querySelector('.reject-app-btn');
+          if (rejectBtn) {
+            rejectBtn.addEventListener('click', async () => {
+              await updateAppStatus(oppId, app.id, 'rejected');
+            });
+          }
+
+          appsListContainer.appendChild(item);
+        });
+      }
+
+      async function updateAppStatus(oppId, appId, status) {
+        try {
+          const res = await fetch(`/api/opportunities/applications/${appId}/status`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': getCookie('csrfToken') || ''
+            },
+            body: JSON.stringify({ status })
+          });
+          const data = await res.json();
+          if (data.success) {
+            alert(`Application ${status}.`);
+            viewAppsModal.classList.remove('show');
+            loadData();
+          } else {
+            alert(data.message);
+          }
+        } catch (e) {
+          alert('Failed to update status.');
+        }
+      }
+
+      // Handle submitting opportunity post
+      postOpportunityForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const title = document.getElementById('postTitle').value;
+        const roles_needed = document.getElementById('postRoles').value;
+        const description = document.getElementById('postDesc').value;
+
+        try {
+          const res = await fetch('/api/opportunities', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': getCookie('csrfToken') || ''
+            },
+            body: JSON.stringify({ title, roles_needed, description })
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            alert('Opportunity posted successfully.');
+            postOpportunityForm.reset();
+            postModal.classList.remove('show');
+            loadData();
+          } else {
+            alert(data.message);
+          }
+        } catch (err) {
+          alert('Error posting opportunity.');
+        }
+      });
+
+      // Handle applying to opportunity
+      applyForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const oppId = document.getElementById('applyOppId').value;
+        const message = document.getElementById('applyMessage').value;
+
+        try {
+          const res = await fetch(`/api/opportunities/${oppId}/apply`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': getCookie('csrfToken') || ''
+            },
+            body: JSON.stringify({ message })
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            alert('Application submitted successfully!');
+            applyForm.reset();
+            applyModal.classList.remove('show');
+            loadData();
+          } else {
+            alert(data.message);
+          }
+        } catch (err) {
+          alert('Error submitting application.');
+        }
+      });
+
+      // Helpers
+      function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+      }
+
+      function escapeHTML(str) {
+        return str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+      }
+
+      // Initial execution
+      checkAuth().then(loadData);
+    });
+  </script>
+</body>
+
+</html>

@@ -11,7 +11,9 @@ const VERIFIED_ONLY_ROUTES = [
   '/leaderboard',
   '/crew.htm',
   '/project.htm',
-  '/scripts.htm'
+  '/scripts.htm',
+  '/opportunities.htm',
+  '/opportunities'
 ];
 
 export async function proxy(request: NextRequest) {
@@ -94,6 +96,8 @@ export const config = {
     '/leaderboard/:path*',
     '/crew.htm',
     '/project.htm',
-    '/scripts.htm'
+    '/scripts.htm',
+    '/opportunities.htm',
+    '/opportunities'
   ],
 };

@@ -1409,6 +1409,7 @@ export default function ChatPage() {
     setState('ready');
   }, [setActiveConversation]);
 
+  /* eslint-disable react-hooks/preserve-manual-memoization */
   const handleNavigateToCommunity = useCallback(async (comm: any) => {
     setInCommunity(true);
     setCommunityData(comm);
@@ -1445,6 +1446,7 @@ export default function ChatPage() {
       }
     }
   }, [conversations, fetchConversations, fetchMessages, setActiveConversation]);
+  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   useEffect(() => {
     const initialize = async () => {
@@ -2038,6 +2040,7 @@ export default function ChatPage() {
         <nav>
           <a href="/#explore">Discover Projects</a>
           <a href="/crew">Find Crew</a>
+          <a href="/opportunities">Opportunities</a>
           <a href="/leaderboard">Leaderboard</a>
           <a href="/#upload">Share Your Script</a>
           <a href="/profile">Profile</a>
