@@ -105,8 +105,7 @@ function createToken(user) {
   if (!secret) {
     throw new Error('JWT_SECRET is not configured');
   }
-  
-  // Ensure primary admin/dev email always has the Developer role in the session token
+
   const role = user.role || '';
 
   return jwt.sign(
@@ -114,8 +113,6 @@ function createToken(user) {
       id: user.id,
       email: user.email,
       role: role,
-      // secondary_role is critical — requireAdmin/requireSecondaryRole checks this field.
-      // Without it, admin subdomain access always fails, causing the redirect loop.
       secondary_role: user.secondary_role || null,
       email_verified: user.email_verified === 1 || user.email_verified === true
     },
@@ -126,23 +123,16 @@ function createToken(user) {
 
 /**
  * Build cookie options for the auth token.
- * In production on the custom domain, `domain` is set to the apex domain so
- * the cookie is shared across takeone-nexus.net.in AND admin.takeone-nexus.net.in.
- * On Vercel preview deployments, `domain` is left undefined so the browser
- * scopes the cookie to the active Vercel subdomain automatically.
  */
 function getCookieOptions() {
   const isProd = process.env.NODE_ENV === 'production';
   const isVercelPreview = Boolean(process.env.VERCEL_URL?.includes('vercel.app'));
   return {
     httpOnly: true,
-    secure: true, // Always secure to protect tokens and satisfy CodeQL checks
+    secure: true,
     sameSite: isProd ? 'None' : 'Lax',
     path: '/',
-    maxAge: 10 * 24 * 60 * 60 * 1000, // 10 days
-    // Only pin the domain on the custom production domain.
-    // On Vercel previews, leave domain undefined so the browser uses the
-    // current host automatically (e.g. take-one-nexus.vercel.app).
+    maxAge: 10 * 24 * 60 * 60 * 1000,
     domain: isProd && !isVercelPreview ? '.takeone-nexus.net.in' : undefined
   };
 }
@@ -205,12 +195,11 @@ router.post('/register', registerLimiter, registerValidation, async (req, res) =
   const isProd = process.env.NODE_ENV === 'production';
   try {
     const { name, email: normalizedEmail, password, role, college, city, gender, screen_name, display_preference } = req.body;
-    
+
     if (!isProd) {
       console.log(`[AUTH_DEBUG] Registration attempt for email: ${normalizedEmail}`);
     }
 
-    // Check for existing user
     let existingUsers;
     try {
       [existingUsers] = await pool.query(
@@ -219,7 +208,7 @@ router.post('/register', registerLimiter, registerValidation, async (req, res) =
       );
     } catch (dbError) {
       console.error('[DB] Register check failed:', dbError.message);
-      throw dbError; // Caught by outer try-catch
+      throw dbError;
     }
 
     if (existingUsers && existingUsers.length > 0) {
@@ -262,13 +251,9 @@ router.post('/register', registerLimiter, registerValidation, async (req, res) =
 
     const token = createToken(user);
     const cookieOpts = getCookieOptions();
-    
+
     if (!isProd) {
       console.log(`[AUTH_DEBUG] ✅ Registration success: Created user ${user.email} (ID: ${user.id})`);
-      console.log(`[AUTH_DEBUG] Cookie options:`, {
-        ...cookieOpts,
-        value: '[REDACTED]'
-      });
     }
 
     res.cookie('token', token, cookieOpts);
@@ -292,12 +277,10 @@ router.post('/register', registerLimiter, registerValidation, async (req, res) =
       token: token
     });
 
-    // Send welcome email asynchronously (non-blocking)
     sendWelcomeEmail(user.email, user.name).catch(err => {
       console.error('[Registration] Background email task failed:', err.message);
     });
 
-    // Send verification email asynchronously via Resend
     (async () => {
       try {
         const token = crypto.randomBytes(32).toString('hex');
@@ -312,14 +295,12 @@ router.post('/register', registerLimiter, registerValidation, async (req, res) =
           },
         });
 
-        // Transmission: Send Cinematic Verification Email
         await sendVerificationEmail(user.email, user.name, token);
       } catch (verifyErr) {
         console.error('[Registration] Verification email failed:', verifyErr.message);
       }
     })();
 
-    // Trigger Pusher update for admin dashboard
     if (process.env.PUSHER_APP_ID) {
       pusher.trigger('admin-dashboard', 'update', {
         type: 'USER_CREATED',
@@ -339,8 +320,7 @@ router.post('/register', registerLimiter, registerValidation, async (req, res) =
     console.error(`Error Type: ${error.constructor.name}`);
     console.error(`Error Code: ${error.code}`);
     console.error(`Error Message: ${error.message}`);
-    
-    // JWT configuration error
+
     if (error.message.includes('JWT_SECRET')) {
       return res.status(500).json({
         success: false,
@@ -348,7 +328,6 @@ router.post('/register', registerLimiter, registerValidation, async (req, res) =
       });
     }
 
-    // Database duplicate entry
     if (error.code === 'ER_DUP_ENTRY' || error.message.includes('Duplicate entry')) {
       return res.status(409).json({
         success: false,
@@ -356,7 +335,6 @@ router.post('/register', registerLimiter, registerValidation, async (req, res) =
       });
     }
 
-    // Database connection issues
     const connErrors = ['ECONNREFUSED', 'ETIMEDOUT', 'PROTOCOL_CONNECTION_LOST', 'ER_ACCESS_DENIED_ERROR'];
     if (connErrors.includes(error.code) || error.message.includes('connect')) {
       return res.status(503).json({
@@ -382,7 +360,7 @@ const loginValidation = [
 router.post('/login', loginLimiter, loginValidation, async (req, res) => {
   const { email: normalizedEmail, password } = req.body;
   const isProd = process.env.NODE_ENV === 'production';
-  
+
   try {
     if (!isProd) {
       console.log(`[AUTH_DEBUG] Login attempt for email: ${normalizedEmail}`);
@@ -427,13 +405,9 @@ router.post('/login', loginLimiter, loginValidation, async (req, res) => {
 
     const token = createToken(user);
     const cookieOpts = getCookieOptions();
-    
+
     if (!isProd) {
       console.log(`[AUTH_DEBUG] ✅ Login success: Generated session token for user: ${user.email} (ID: ${user.id})`);
-      console.log(`[AUTH_DEBUG] Cookie options:`, {
-        ...cookieOpts,
-        value: '[REDACTED]'
-      });
     }
 
     res.cookie('token', token, cookieOpts);
@@ -461,7 +435,7 @@ router.post('/login', loginLimiter, loginValidation, async (req, res) => {
     console.error('--- Login Crash ---');
     console.error('Error:', error);
     console.error('Stack:', error.stack);
-    
+
     if (error.message.includes('JWT_SECRET')) {
       return res.status(500).json({
         success: false,
@@ -486,7 +460,7 @@ router.post('/login', loginLimiter, loginValidation, async (req, res) => {
 
 router.post('/logout', (req, res) => {
   const isProd = process.env.NODE_ENV === 'production';
-  
+
   if (!isProd) {
     console.log(`[AUTH_DEBUG] Logout request received. Clearing auth token cookie.`);
   }
@@ -537,7 +511,6 @@ router.get('/me', authenticateUser, async (req, res) => {
       });
     }
 
-    // Auto cookie update if database says verified but token says unverified
     if (profile.email_verified === true && req.user.email_verified !== true) {
       try {
         const updatedUser = {
@@ -652,12 +625,14 @@ router.get('/search', authenticateUser, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/users/admin/list
+ * Admin-only paginated user list
+ */
 router.get('/admin/list', authenticateUser, authenticatedApiLimiter, async (req, res) => {
   try {
     const role = String(req.user.role || '').toLowerCase();
     const secondaryRole = String(req.user.secondary_role || '').toLowerCase();
-    // Mirrors existing requireAdmin behavior while preserving
-    // developer/moderator access already granted by this route.
     const isAuthorized =
       role === 'developer' ||
       role === 'admin' ||
@@ -671,11 +646,18 @@ router.get('/admin/list', authenticateUser, authenticatedApiLimiter, async (req,
       });
     }
 
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+    const offset = (page - 1) * limit;
+
+    const [totalRows] = await pool.query('SELECT COUNT(*) AS total FROM users');
+    const total = Number(totalRows[0]?.total || 0);
+
     const rows = await safeQuery(
       `SELECT id, name, email, role, college, city, created_at
        FROM users
        ORDER BY created_at DESC, id DESC
-       LIMIT 500`
+       LIMIT ${limit} OFFSET ${offset}`
     );
 
     return res.json({
@@ -683,14 +665,69 @@ router.get('/admin/list', authenticateUser, authenticatedApiLimiter, async (req,
       data: rows.map((row) => ({
         ...row,
         name: formatDisplayName(row.name)
-      }))
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: page * limit < total
+      }
     });
   } catch (error) {
     console.error('Admin user list error:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Could not load users'
+    return res.status(500).json({ success: false, message: 'Could not load users' });
+  }
+});
+
+/**
+ * GET /api/users/leaderboard
+ * Get top users ranked by credits
+ */
+router.get('/leaderboard', async (req, res) => {
+  try {
+    const rows = await safeQuery(
+      `SELECT id, name, role, college, city, avatar_url, gender, credits,
+              screen_name, display_preference, email_verified
+       FROM users
+       WHERE credits >= 0
+       ORDER BY credits DESC, name ASC
+       LIMIT 100`
+    );
+
+    res.json({
+      success: true,
+      data: rows.map(r => ({
+        ...r,
+        displayName: getCanonicalDisplayName(r)
+      }))
     });
+  } catch (error) {
+    console.error('Leaderboard fetch error:', error.message);
+    res.status(500).json({ success: false, message: 'Could not load leaderboard' });
+  }
+});
+
+/**
+ * GET /api/users/transactions
+ * Get credit transaction history for the authenticated user
+ */
+router.get('/transactions', authenticateUser, async (req, res) => {
+  try {
+    const userId = Number(req.user.id);
+    const transactions = await prisma.creditTransaction.findMany({
+      where: { user_id: userId },
+      orderBy: { created_at: 'desc' },
+      take: 50
+    });
+
+    res.json({
+      success: true,
+      data: transactions
+    });
+  } catch (error) {
+    console.error('Transactions fetch error:', error.message);
+    res.status(500).json({ success: false, message: 'Could not load transaction history' });
   }
 });
 
@@ -744,7 +781,6 @@ router.put('/:id', authenticateUser, requireSameUser, profileUpdateLimiter, asyn
       }
     });
 
-    // Trigger Pusher update for admin dashboard
     if (process.env.PUSHER_APP_ID) {
       pusher.trigger('admin-dashboard', 'update', {
         type: 'USER_UPDATED',
@@ -775,6 +811,10 @@ router.put('/:id', authenticateUser, requireSameUser, profileUpdateLimiter, asyn
   }
 });
 
+/**
+ * GET /api/users/:id
+ * Get private profile for the authenticated user themselves
+ */
 router.get('/:id', authenticateUser, requireSameUser, async (req, res) => {
   try {
     const userId = Number(req.params.id);
@@ -912,57 +952,6 @@ router.get('/public/:id', async (req, res) => {
   }
 });
 
-/**
- * GET /api/users/leaderboard
- * Get top users ranked by credits
- */
-router.get('/leaderboard', async (req, res) => {
-  try {
-    const rows = await safeQuery(
-      `SELECT id, name, role, college, city, avatar_url, gender, credits,
-              screen_name, display_preference, email_verified
-       FROM users
-       WHERE credits >= 0
-       ORDER BY credits DESC, name ASC
-       LIMIT 100`
-    );
-
-    res.json({
-      success: true,
-      data: rows.map(r => ({
-        ...r,
-        displayName: getCanonicalDisplayName(r)
-      }))
-    });
-  } catch (error) {
-    console.error('Leaderboard fetch error:', error.message);
-    res.status(500).json({ success: false, message: 'Could not load leaderboard signal' });
-  }
-});
-
-/**
- * GET /api/users/transactions
- * Get credit transaction history for the authenticated user
- */
-router.get('/transactions', authenticateUser, async (req, res) => {
-  try {
-    const userId = Number(req.user.id);
-    const transactions = await prisma.creditTransaction.findMany({
-      where: { user_id: userId },
-      orderBy: { created_at: 'desc' },
-      take: 50
-    });
-
-    res.json({
-      success: true,
-      data: transactions
-    });
-  } catch (error) {
-    console.error('Transactions fetch error:', error.message);
-    res.status(500).json({ success: false, message: 'Could not load transaction history' });
-  }
-});
-
 // Allowed event types — reject anything outside this set to prevent abuse
 const ALLOWED_EVENT_TYPES = new Set(['profile_view', 'portfolio_view', 'project_engagement']);
 
@@ -979,12 +968,10 @@ router.post('/analytics/track', analyticsTrackLimiter, async (req, res) => {
       return res.status(400).json({ success: false, message: 'user_id and event_type are required' });
     }
 
-    // Reject unknown event types — prevents arbitrary data injection
     if (!ALLOWED_EVENT_TYPES.has(event_type)) {
       return res.status(400).json({ success: false, message: 'Invalid event_type' });
     }
 
-    // Validate the target user actually exists to prevent inflating counts for non-existent users
     const [targetRows] = await pool.query(
       'SELECT id FROM users WHERE id = ? LIMIT 1',
       [Number(user_id)]
@@ -994,8 +981,7 @@ router.post('/analytics/track', analyticsTrackLimiter, async (req, res) => {
     }
 
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
-    
-    // Salted hash using existing JWT_SECRET to protect visitor PII and prevent dictionary attacks
+
     const salt = process.env.JWT_SECRET || 'fallback-analytics-salt-v1';
     const hashedIp = crypto.createHash('sha256').update(String(ip) + salt).digest('hex').substring(0, 16);
 
@@ -1023,7 +1009,6 @@ router.get('/analytics/summary', authenticateUser, authenticatedApiLimiter, asyn
   try {
     const userId = Number(req.user.id);
 
-    // Get simple counts
     const profileViews = await prisma.analyticsEvent.count({
       where: { user_id: userId, event_type: 'profile_view' }
     });
@@ -1036,14 +1021,12 @@ router.get('/analytics/summary', authenticateUser, authenticatedApiLimiter, asyn
       where: { user_id: userId, event_type: 'project_engagement' }
     });
 
-    // Get recent activity feed (avoid private info, just event type and timestamp)
     const recentEvents = await prisma.analyticsEvent.findMany({
       where: { user_id: userId },
       orderBy: { created_at: 'desc' },
       take: 10
     });
 
-    // Real per-day aggregation for the last 7 days (profile_view events only)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
     sevenDaysAgo.setHours(0, 0, 0, 0);
@@ -1057,10 +1040,8 @@ router.get('/analytics/summary', authenticateUser, authenticatedApiLimiter, asyn
       [userId, sevenDaysAgo]
     );
 
-    // Build a full 7-day map so days with zero events still appear in the chart
     const dailyMap = {};
     dailyRows.forEach(row => {
-      // row.day is a Date object from mysql2 — convert to ISO date string key
       const key = row.day instanceof Date
         ? row.day.toISOString().slice(0, 10)
         : String(row.day).slice(0, 10);
