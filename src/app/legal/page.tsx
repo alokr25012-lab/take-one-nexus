@@ -16,6 +16,7 @@ export default function LegalPage() {
         <nav>
           <a href="/">Home</a>
           <a href="/crew">Find Crew</a>
+          <a href="/opportunities">Opportunities</a>
           <a href="/profile">Profile</a>
           <a href="/moderation">Moderation</a>
         </nav>

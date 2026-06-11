@@ -50,6 +50,8 @@ model User {
   community_subscriptions CommunitySubscription[]
   invitee_invitations     CommunityInvitation[]  @relation("InviteeInvitations")
   inviter_invitations     CommunityInvitation[]  @relation("InviterInvitations")
+  opportunities           Opportunity[]
+  opportunity_apps        OpportunityApplication[]
 
   @@index([secondary_role], map: "idx_users_secondary_role")
   @@index([email_verified], map: "idx_users_email_verified")
@@ -460,6 +462,37 @@ model CommunityInvitation {
   @@index([invitee_id])
   @@index([community_id])
   @@map("community_invitations")
+}
+
+model Opportunity {
+  id           Int                      @id @default(autoincrement()) @db.UnsignedInt
+  user_id      Int                      @db.UnsignedInt
+  title        String                   @db.VarChar(255)
+  description  String                   @db.Text
+  roles_needed String                   @db.VarChar(255) // Comma-separated roles
+  created_at   DateTime                 @default(now()) @db.Timestamp(0)
+  updated_at   DateTime                 @default(now()) @updatedAt @db.Timestamp(0)
+  user         User                     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  applications OpportunityApplication[]
+
+  @@index([user_id])
+  @@map("opportunities")
+}
+
+model OpportunityApplication {
+  id             Int         @id @default(autoincrement()) @db.UnsignedInt
+  opportunity_id Int         @db.UnsignedInt
+  applicant_id   Int         @db.UnsignedInt
+  message        String?     @db.Text
+  status         String      @default("pending") @db.VarChar(40)
+  created_at     DateTime    @default(now()) @db.Timestamp(0)
+  updated_at     DateTime    @default(now()) @updatedAt @db.Timestamp(0)
+  opportunity    Opportunity @relation(fields: [opportunity_id], references: [id], onDelete: Cascade)
+  applicant      User        @relation(fields: [applicant_id], references: [id], onDelete: Cascade)
+
+  @@unique([opportunity_id, applicant_id])
+  @@index([applicant_id])
+  @@map("opportunity_applications")
 }
 
 
