@@ -566,3 +566,47 @@ header.nav-open .nav-toggle span:nth-child(3) { transform: translateY(-6.5px) ro
     text-align: left;
   }
 }
+
+/* ── PAGINATION ── */
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 36px;
+  margin-bottom: 20px;
+  padding: 20px;
+}
+
+.pagination-btn {
+  background: rgba(6, 8, 10, 0.55);
+  border: 1px solid rgba(255, 77, 26, 0.25);
+  color: var(--cream);
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 10px 20px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.25s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  border-color: var(--neon);
+  background: rgba(255, 77, 26, 0.1);
+  box-shadow: 0 0 12px rgba(255, 77, 26, 0.2);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.pagination-info {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--silver);
+  text-transform: uppercase;
+}

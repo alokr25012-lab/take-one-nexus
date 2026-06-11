@@ -34,6 +34,36 @@ function logTransaction(details) {
   }
 }
 
+function logCommunityEvent(action, details = {}) {
+  try {
+    const logDir = path.join(__dirname, '../logs');
+    if (!fs.existsSync(logDir)) {
+      try {
+        fs.mkdirSync(logDir, { recursive: true });
+      } catch (e) {
+        // Ignore folder creation errors on serverless
+      }
+    }
+    const logPath = path.join(logDir, 'community.log');
+    const timestamp = new Date().toISOString();
+    const logEntry = `[${timestamp}] [COMMUNITY_EVENT] [${action}] ${JSON.stringify(details)}\n`;
+    try {
+      fs.appendFileSync(logPath, logEntry, 'utf8');
+    } catch (e) {
+      // Ignore write errors on read-only serverless filesystems
+    }
+    console.log(JSON.stringify({
+      timestamp,
+      level: 'INFO',
+      module: 'community',
+      action,
+      ...details
+    }));
+  } catch (err) {
+    console.error('Logging failed:', err.message);
+  }
+}
+
 /**
  * GET /api/community/pricing-configs
  * Returns the seeding/pricing settings
@@ -99,11 +129,15 @@ router.get('/my-community', authenticateUser, async (req, res) => {
       inCommunity: true,
       communities: memberRecords.map(r => ({
         ...r.community,
+        logo_url: r.community ? r.community.avatar_url : null,
         role: r.role
       })),
       // Backward compatibility:
       role: memberRecords[0].role,
-      community: memberRecords[0].community
+      community: memberRecords[0].community ? {
+        ...memberRecords[0].community,
+        logo_url: memberRecords[0].community.avatar_url
+      } : null
     });
   } catch (error) {
     console.error('[Community] Get my community error:', error.message);
@@ -520,6 +554,7 @@ router.get('/dashboard', authenticateUser, async (req, res) => {
         name: community.name,
         description: community.description,
         avatar_url: community.avatar_url,
+        logo_url: community.avatar_url,
         banner_url: community.banner_url,
         owner_id: community.owner_id,
         max_members: community.max_members,
@@ -715,7 +750,7 @@ router.post('/members/invite', authenticateUser, inviteLimiter, inviteMemberVali
                   <p>You have been invited by <strong>${inviterName}</strong> to join the community <strong>${community.name}</strong> on the TAKE ONE platform.</p>
                   <p>Accept this invitation to unlock shared chat spaces, crew call listings, and collaborative tools for this community.</p>
                   <div class="cta-wrap">
-                    <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/chat" class="cta">Accept Invitation</a>
+                    <a href="${process.env.NEXT_PUBLIC_APP_URL}/chat" class="cta">Accept Invitation</a>
                   </div>
                 </div>
                 <div class="footer">
@@ -730,6 +765,8 @@ router.post('/members/invite', authenticateUser, inviteLimiter, inviteMemberVali
         console.error('[Community] Failed to send invitation email:', emailErr.message);
       }
     }
+
+    logCommunityEvent('member_invited', { communityId, inviteeId: targetUser.id, inviterId: callerId });
 
     res.json({
       success: true,
@@ -768,9 +805,17 @@ router.get('/invitations/my-invitations', authenticateUser, async (req, res) => 
       }
     });
 
+    const mappedInvitations = invitations.map(inv => ({
+      ...inv,
+      community: inv.community ? {
+        ...inv.community,
+        logo_url: inv.community.avatar_url
+      } : null
+    }));
+
     res.json({
       success: true,
-      invitations
+      invitations: mappedInvitations
     });
   } catch (error) {
     console.error('[Community] Get my invitations error:', error.message);
@@ -847,6 +892,8 @@ router.post('/invitations/:id/accept', authenticateUser, async (req, res) => {
       }
     });
 
+    logCommunityEvent('invitation_accepted', { invitationId, userId, communityId: community.id });
+
     res.json({
       success: true,
       message: `You have successfully joined ${community.name}.`
@@ -883,6 +930,8 @@ router.post('/invitations/:id/reject', authenticateUser, async (req, res) => {
       data: { status: 'REJECTED' }
     });
 
+    logCommunityEvent('invitation_rejected', { invitationId, userId, communityId: invitation.community_id });
+
     res.json({
       success: true,
       message: 'Invitation rejected.'
@@ -900,6 +949,11 @@ router.post('/invitations/:id/reject', authenticateUser, async (req, res) => {
 router.post('/logo', authenticateUser, (req, res) => {
   uploadLogo.single('logo')(req, res, async (err) => {
     if (err) {
+      const communityId = req.body ? Number(req.body.communityId || req.body.community_id) : null;
+      logCommunityEvent('logo_upload_failed', { communityId, userId: Number(req.user.id), error: err.message });
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ success: false, message: 'File too large. Maximum size allowed is 5 MB.' });
+      }
       return res.status(400).json({ success: false, message: err.message });
     }
 
@@ -934,11 +988,13 @@ router.post('/logo', authenticateUser, (req, res) => {
         return res.status(403).json({ success: false, message: 'Access denied: Community Management permissions required' });
       }
 
-      const logoUrl = `/assets/uploads/logos/${req.file.filename}`;
+      const logoUrl = `/uploads/logos/${req.file.filename}`;
       await prisma.community.update({
         where: { id: communityId },
-        data: { logo_url: logoUrl }
+        data: { avatar_url: logoUrl }
       });
+
+      logCommunityEvent('logo_upload_success', { communityId, userId: Number(req.user.id), fileName: req.file.filename, size: req.file.size });
 
       res.json({
         success: true,
@@ -947,6 +1003,7 @@ router.post('/logo', authenticateUser, (req, res) => {
       });
     } catch (error) {
       console.error('[Community] Logo upload error:', error.message);
+      logCommunityEvent('logo_upload_failed', { communityId: Number(req.body.communityId || req.body.community_id), userId: Number(req.user.id), error: error.message });
       if (req.file && fs.existsSync(req.file.path)) {
         fs.unlinkSync(req.file.path);
       }
@@ -1309,6 +1366,325 @@ router.post('/webhook', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('[Community Webhook] Processing error:', error.message);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/community/list-all
+ * List all communities with search and user request status
+ */
+router.get('/list-all', authenticateUser, async (req, res) => {
+  try {
+    const userId = Number(req.user.id);
+    const search = req.query.search ? String(req.query.search).trim() : '';
+
+    const communities = await prisma.community.findMany({
+      where: {
+        ...(search ? {
+          OR: [
+            { name: { contains: search } },
+            { description: { contains: search } }
+          ]
+        } : {})
+      },
+      include: {
+        members: true,
+        join_requests: {
+          where: { user_id: userId }
+        }
+      }
+    });
+
+    const data = communities.map(c => {
+      const isMember = c.members.some(m => m.user_id === userId);
+      const reqStatus = c.join_requests.length > 0 ? c.join_requests[0].status : null;
+      const reqId = c.join_requests.length > 0 ? c.join_requests[0].id : null;
+      const requestedDate = c.join_requests.length > 0 ? c.join_requests[0].created_at : null;
+
+      return {
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        logo_url: c.avatar_url,
+        memberCount: c.members.length,
+        isMember,
+        requestStatus: reqStatus,
+        requestId: reqId,
+        requestedDate
+      };
+    });
+
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('[Community] List all communities error:', error.message);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/community/join-request
+ * Create a new join request for a community
+ */
+router.post('/join-request', authenticateUser, async (req, res) => {
+  try {
+    const userId = Number(req.user.id);
+    const communityId = Number(req.body.communityId || req.body.community_id);
+
+    if (!communityId) {
+      return res.status(400).json({ success: false, message: 'Community ID is required' });
+    }
+
+    const member = await prisma.communityMember.findFirst({
+      where: { community_id: communityId, user_id: userId }
+    });
+    if (member) {
+      return res.status(400).json({ success: false, message: 'You are already a member of this community.' });
+    }
+
+    const existing = await prisma.communityJoinRequest.findUnique({
+      where: {
+        community_id_user_id: {
+          community_id: communityId,
+          user_id: userId
+        }
+      }
+    });
+
+    if (existing) {
+      if (existing.status === 'PENDING') {
+        return res.status(400).json({ success: false, message: 'You already have a pending join request.' });
+      }
+      const updated = await prisma.communityJoinRequest.update({
+        where: { id: existing.id },
+        data: { status: 'PENDING', updated_at: new Date() }
+      });
+      return res.json({ success: true, message: 'Request submitted successfully.', data: updated });
+    }
+
+    const created = await prisma.communityJoinRequest.create({
+      data: {
+        community_id: communityId,
+        user_id: userId,
+        status: 'PENDING'
+      }
+    });
+
+    res.json({ success: true, message: 'Request submitted successfully.', data: created });
+  } catch (error) {
+    console.error('[Community] Join request error:', error.message);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/community/my-requests
+ * Get all requests made by the current user
+ */
+router.get('/my-requests', authenticateUser, async (req, res) => {
+  try {
+    const userId = Number(req.user.id);
+    const requests = await prisma.communityJoinRequest.findMany({
+      where: { user_id: userId },
+      include: {
+        community: true
+      },
+      orderBy: { created_at: 'desc' }
+    });
+
+    res.json({
+      success: true,
+      data: requests.map(r => ({
+        id: r.id,
+        status: r.status,
+        requestedDate: r.created_at,
+        updatedDate: r.updated_at,
+        community: {
+          id: r.community.id,
+          name: r.community.name,
+          logo_url: r.community.avatar_url
+        }
+      }))
+    });
+  } catch (error) {
+    console.error('[Community] Get my requests error:', error.message);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/community/incoming-requests
+ * Get pending requests for community owner/moderator
+ */
+router.get('/incoming-requests', authenticateUser, async (req, res) => {
+  try {
+    const userId = Number(req.user.id);
+    const communityId = Number(req.query.communityId);
+
+    if (!communityId) {
+      return res.status(400).json({ success: false, message: 'Community ID is required' });
+    }
+
+    const membership = await prisma.communityMember.findFirst({
+      where: {
+        community_id: communityId,
+        user_id: userId,
+        role: { in: ['Owner', 'Moderator'] }
+      }
+    });
+
+    if (!membership) {
+      return res.status(403).json({ success: false, message: 'Access denied: Community Management permissions required' });
+    }
+
+    const requests = await prisma.communityJoinRequest.findMany({
+      where: { community_id: communityId, status: 'PENDING' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar_url: true,
+            screen_name: true
+          }
+        }
+      },
+      orderBy: { created_at: 'desc' }
+    });
+
+    res.json({ success: true, data: requests });
+  } catch (error) {
+    console.error('[Community] Get incoming requests error:', error.message);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/community/join-request/:id/approve
+ * Approve a join request
+ */
+router.post('/join-request/:id/approve', authenticateUser, async (req, res) => {
+  try {
+    const userId = Number(req.user.id);
+    const requestId = Number(req.params.id);
+
+    const joinRequest = await prisma.communityJoinRequest.findUnique({
+      where: { id: requestId },
+      include: { community: true }
+    });
+
+    if (!joinRequest) {
+      return res.status(404).json({ success: false, message: 'Join request not found.' });
+    }
+
+    const membership = await prisma.communityMember.findFirst({
+      where: {
+        community_id: joinRequest.community_id,
+        user_id: userId,
+        role: { in: ['Owner', 'Moderator'] }
+      }
+    });
+
+    if (!membership) {
+      return res.status(403).json({ success: false, message: 'Access denied: Community Management permissions required' });
+    }
+
+    if (joinRequest.status !== 'PENDING') {
+      return res.status(400).json({ success: false, message: `Request is already ${joinRequest.status.toLowerCase()}.` });
+    }
+
+    const memberCount = await prisma.communityMember.count({
+      where: { community_id: joinRequest.community_id }
+    });
+
+    if (joinRequest.community.max_members && memberCount >= joinRequest.community.max_members) {
+      return res.status(400).json({ success: false, message: 'This community has reached its maximum member capacity.' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const isMember = await tx.communityMember.findFirst({
+        where: { community_id: joinRequest.community_id, user_id: joinRequest.user_id }
+      });
+
+      if (!isMember) {
+        const group = await tx.communityGroup.findFirst({
+          where: { community_id: joinRequest.community_id, name: 'General' }
+        });
+
+        await tx.communityMember.create({
+          data: {
+            community_id: joinRequest.community_id,
+            user_id: joinRequest.user_id,
+            role: 'Member'
+          }
+        });
+
+        if (group) {
+          await tx.conversationMember.create({
+            data: {
+              conversation_id: group.conversation_id,
+              user_id: joinRequest.user_id,
+              role: 'Member'
+            }
+          });
+        }
+      }
+
+      await tx.communityJoinRequest.update({
+        where: { id: requestId },
+        data: { status: 'ACCEPTED' }
+      });
+    });
+
+    res.json({ success: true, message: 'Request approved successfully.' });
+  } catch (error) {
+    console.error('[Community] Approve join request error:', error.message);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/community/join-request/:id/reject
+ * Reject a join request
+ */
+router.post('/join-request/:id/reject', authenticateUser, async (req, res) => {
+  try {
+    const userId = Number(req.user.id);
+    const requestId = Number(req.params.id);
+
+    const joinRequest = await prisma.communityJoinRequest.findUnique({
+      where: { id: requestId }
+    });
+
+    if (!joinRequest) {
+      return res.status(404).json({ success: false, message: 'Join request not found.' });
+    }
+
+    const membership = await prisma.communityMember.findFirst({
+      where: {
+        community_id: joinRequest.community_id,
+        user_id: userId,
+        role: { in: ['Owner', 'Moderator'] }
+      }
+    });
+
+    if (!membership) {
+      return res.status(403).json({ success: false, message: 'Access denied: Community Management permissions required' });
+    }
+
+    if (joinRequest.status !== 'PENDING') {
+      return res.status(400).json({ success: false, message: `Request is already ${joinRequest.status.toLowerCase()}.` });
+    }
+
+    await prisma.communityJoinRequest.update({
+      where: { id: requestId },
+      data: { status: 'REJECTED' }
+    });
+
+    res.json({ success: true, message: 'Request rejected successfully.' });
+  } catch (error) {
+    console.error('[Community] Reject join request error:', error.message);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });

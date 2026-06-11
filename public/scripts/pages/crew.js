@@ -96,7 +96,45 @@ function personCard(person) {
   `;
 }
 
-function renderPeople(people) {
+let currentPage = 1;
+
+function renderPagination(current, total) {
+  const container = document.getElementById('crewPagination');
+  if (!container) return;
+
+  if (total <= 1) {
+    container.innerHTML = '';
+    return;
+  }
+
+  container.innerHTML = `
+    <button class="pagination-btn" id="prevPageBtn" ${current <= 1 ? 'disabled' : ''}>Prev</button>
+    <span class="pagination-info">Page ${current} of ${total}</span>
+    <button class="pagination-btn" id="nextPageBtn" ${current >= total ? 'disabled' : ''}>Next</button>
+  `;
+
+  document.getElementById('prevPageBtn')?.addEventListener('click', () => {
+    if (current > 1) {
+      loadPeople(current - 1);
+      const target = document.querySelector('.finder-shell');
+      if (target) {
+        window.scrollTo({ top: target.offsetTop - 80, behavior: 'smooth' });
+      }
+    }
+  });
+
+  document.getElementById('nextPageBtn')?.addEventListener('click', () => {
+    if (current < total) {
+      loadPeople(current + 1);
+      const target = document.querySelector('.finder-shell');
+      if (target) {
+        window.scrollTo({ top: target.offsetTop - 80, behavior: 'smooth' });
+      }
+    }
+  });
+}
+
+function renderPeople(people, totalCount) {
   const grid = document.getElementById('crewGrid');
   const status = document.getElementById('crewResultStatus');
   const selected = document.getElementById('selectedRoleLabel');
@@ -104,7 +142,7 @@ function renderPeople(people) {
 
   if (!grid) return;
 
-  if (total) total.textContent = allPeople.length;
+  if (total) total.textContent = totalCount || allPeople.length;
   if (selected) {
     const role = ROLE_FILTERS.find((item) => item.key === activeRole);
     selected.textContent = role?.label || 'All';
@@ -117,10 +155,11 @@ function renderPeople(people) {
   }
 
   grid.innerHTML = people.map(personCard).join('');
-  if (status) status.textContent = `${people.length} people found`;
+  if (status) status.textContent = `${totalCount || people.length} people found`;
 }
 
-async function loadPeople() {
+async function loadPeople(page = 1) {
+  currentPage = page;
   const query = document.getElementById('crewSearchInput')?.value.trim() || '';
   const city = document.getElementById('citySearchInput')?.value.trim() || '';
   const availability = document.getElementById('availabilitySearchInput')?.value || '';
@@ -130,16 +169,19 @@ async function loadPeople() {
       role: activeRole,
       city,
       availability,
-      q: query
+      q: query,
+      page: currentPage,
+      limit: 9
     });
 
     const people = response.data || [];
-    if (!query && !city && !activeRole && !availability) {
+    if (!query && !city && !activeRole && !availability && currentPage === 1) {
       allPeople = people;
       renderRoleFilters();
     }
 
-    renderPeople(people);
+    renderPeople(people, response.total);
+    renderPagination(currentPage, response.totalPages || 1);
   } catch (error) {
     const grid = document.getElementById('crewGrid');
     if (grid) {
@@ -155,7 +197,7 @@ document.getElementById('roleFilterList')?.addEventListener('click', (event) => 
   activeRole = button.dataset.role || '';
   document.querySelectorAll('.role-filter').forEach((item) => item.classList.remove('active'));
   button.classList.add('active');
-  loadPeople();
+  loadPeople(1);
 });
 
 ['crewSearchInput', 'citySearchInput', 'availabilitySearchInput'].forEach((id) => {
@@ -163,11 +205,11 @@ document.getElementById('roleFilterList')?.addEventListener('click', (event) => 
   if (!element) return;
   
   if (element.tagName === 'SELECT') {
-    element.addEventListener('change', loadPeople);
+    element.addEventListener('change', () => loadPeople(1));
   } else {
     element.addEventListener('input', () => {
       clearTimeout(searchTimer);
-      searchTimer = setTimeout(loadPeople, 250);
+      searchTimer = setTimeout(() => loadPeople(1), 250);
     });
   }
 });
@@ -181,8 +223,8 @@ document.getElementById('clearCrewFilters')?.addEventListener('click', () => {
   if (cityInput) cityInput.value = '';
   if (availabilityInput) availabilityInput.value = '';
   renderRoleFilters();
-  loadPeople();
+  loadPeople(1);
 });
 
 renderRoleFilters();
-loadPeople();
+loadPeople(1);

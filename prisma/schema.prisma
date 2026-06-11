@@ -52,6 +52,7 @@ model User {
   inviter_invitations     CommunityInvitation[]  @relation("InviterInvitations")
   opportunities           Opportunity[]
   opportunity_apps        OpportunityApplication[]
+  community_join_requests CommunityJoinRequest[]
 
   @@index([secondary_role], map: "idx_users_secondary_role")
   @@index([email_verified], map: "idx_users_email_verified")
@@ -367,6 +368,7 @@ model Community {
   groups          CommunityGroup[]
   subscriptions   CommunitySubscription[]
   invitations     CommunityInvitation[]
+  join_requests   CommunityJoinRequest[]
 
   @@map("communities")
 }
@@ -495,4 +497,19 @@ model OpportunityApplication {
   @@map("opportunity_applications")
 }
 
+model CommunityJoinRequest {
+  id              Int          @id @default(autoincrement()) @db.UnsignedInt
+  community_id    Int          @db.UnsignedInt
+  user_id         Int          @db.UnsignedInt
+  status          String       @default("PENDING") @db.VarChar(50)
+  created_at      DateTime     @default(now()) @db.Timestamp(0)
+  updated_at      DateTime     @default(now()) @updatedAt @db.Timestamp(0)
 
+  community       Community    @relation(fields: [community_id], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([community_id, user_id])
+  @@index([user_id])
+  @@index([community_id])
+  @@map("community_join_requests")
+}

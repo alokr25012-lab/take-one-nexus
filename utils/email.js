@@ -138,7 +138,7 @@ async function sendWelcomeEmail(to, name) {
  */
 async function sendVerificationEmail(to, name, token) {
   if (!process.env.RESEND_API_KEY) return;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
   const verificationUrl = `${appUrl}/api/auth/verify-email?token=${token}`;
 
   try {
@@ -159,7 +159,7 @@ async function sendVerificationEmail(to, name, token) {
  */
 async function sendPasswordResetEmail(to, name, token) {
   if (!process.env.RESEND_API_KEY) return;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
   const resetUrl = `${appUrl}/reset-password?token=${token}`;
 
   try {

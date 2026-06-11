@@ -1725,7 +1725,7 @@ registerForm?.addEventListener('submit', async (e) => {
     const screen_name = document.getElementById('registerScreenName')?.value || '';
     const display_preference = document.getElementById('registerDisplayPreference')?.value || 'Show Real Name Only';
 
-    const payload = { name, email, password, role, gender, college, city, screen_name, display_preference };
+    const payload = { name, email, password, role, gender, college, city, screen_name, display_preference};
     console.log('[Register] Submitting registration payload:', { ...payload, password: '[REDACTED]' });
 
     const response = await API.users.register(payload);

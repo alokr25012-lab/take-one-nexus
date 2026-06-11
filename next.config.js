@@ -64,6 +64,10 @@ const nextConfig = {
         source: '/api/:path*',
         destination: `${legacyApiOrigin}/api/:path*`,
       },
+      {
+        source: '/uploads/:path*',
+        destination: `${legacyApiOrigin}/uploads/:path*`,
+      },
     ];
   },
 };

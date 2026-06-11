@@ -126,6 +126,12 @@ const usePusherConnectionState = (pusher: Pusher | null, onConnected?: () => voi
 const useMessageQueue = (enabled: boolean) => {
   const [queue, setQueue] = useState<QueuedMessage[]>([]);
   const processingRef = useRef(false);
+  const queueRef = useRef<QueuedMessage[]>([]);
+
+  // Keep queueRef in sync with queue state
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
   
   // Restore queue from localStorage on mount
   useEffect(() => {
@@ -169,13 +175,13 @@ const useMessageQueue = (enabled: boolean) => {
   
   const getNextMessageToRetry = useCallback((): QueuedMessage | null => {
     const now = Date.now();
-    const pending = queue.find(msg => 
+    const pending = queueRef.current.find(msg => 
       (msg.status === 'pending' || msg.status === 'failed') &&
       msg.retryCount < 5 &&
       msg.nextRetryAt <= now
     );
     return pending || null;
-  }, [queue]);
+  }, []);
   
   const getExponentialBackoffDelay = (retryCount: number): number => {
     const delays = [1000, 2000, 4000, 8000, 8000];
@@ -195,7 +201,7 @@ const useMessageQueue = (enabled: boolean) => {
   const isProcessing = useCallback(() => processingRef.current, []);
   const setProcessing = useCallback((value: boolean) => { processingRef.current = value; }, []);
   
-  return {
+  return useMemo(() => ({
     queue,
     addToQueue,
     updateMessageStatus,
@@ -204,7 +210,16 @@ const useMessageQueue = (enabled: boolean) => {
     scheduleRetry,
     isProcessing,
     setProcessing
-  };
+  }), [
+    queue,
+    addToQueue,
+    updateMessageStatus,
+    removeFromQueue,
+    getNextMessageToRetry,
+    scheduleRetry,
+    isProcessing,
+    setProcessing
+  ]);
 };
 
 const loadRazorpayScript = () => {
@@ -233,7 +248,7 @@ export default function ChatPage() {
   const [user, setUser] = useState<User | null>(null);
   const isFounder = user?.secondary_role?.toLowerCase() === 'founder';
   const [state, setState] = useState<ChatState>('loading');
-  const [statusText, setStatusText] = useState('Synchronizing with Nexus...');
+  const [statusText, setStatusText] = useState('Synchronizing with Community...');
   const [messageLoading, setMessageLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
@@ -257,12 +272,25 @@ export default function ChatPage() {
 
   // Message Queue System
   const messageQueue = useMessageQueue(true);
+  const {
+    addToQueue,
+    updateMessageStatus,
+    removeFromQueue,
+    getNextMessageToRetry,
+    scheduleRetry,
+    isProcessing,
+    setProcessing
+  } = messageQueue;
   const [pusherConnectionState, setPusherConnectionState] = useState<PusherConnectionState>('disconnected');
 
   // Community System States
   const [inCommunity, setInCommunity] = useState(false);
   const [communityRole, setCommunityRole] = useState<string | null>(null);
   const [communityData, setCommunityData] = useState<any>(null);
+  const communityDataRef = useRef<any>(null);
+  useEffect(() => {
+    communityDataRef.current = communityData;
+  }, [communityData]);
   const [showCommunityDashboard, setShowCommunityDashboard] = useState(false);
   
   // Modals
@@ -293,10 +321,192 @@ export default function ChatPage() {
   const [groupLoading, setGroupLoading] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<any>(null);
 
+  // New Multi-Community and Join Request States
+  const [allCommunities, setAllCommunities] = useState<any[]>([]);
+  const [communitySearchQuery, setCommunitySearchQuery] = useState('');
+  const [allCommunitiesLoading, setAllCommunitiesLoading] = useState(false);
+  const [myRequests, setMyRequests] = useState<any[]>([]);
+  const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
+  const [isJoinRequestModalOpen, setIsJoinRequestModalOpen] = useState(false);
+  const [showAutoInviteModal, setShowAutoInviteModal] = useState(false);
+  const [autoInviteToHandle, setAutoInviteToHandle] = useState<any | null>(null);
+  const [viewingGalaxyLanding, setViewingGalaxyLanding] = useState(false);
+
+  const fetchAllCommunities = useCallback(async (search = '') => {
+    setAllCommunitiesLoading(true);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
+      const res = await fetch(`/api/community/list-all?search=${encodeURIComponent(search)}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAllCommunities(data.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching communities:', err);
+    } finally {
+      setAllCommunitiesLoading(false);
+    }
+  }, []);
+
+  const fetchMyRequests = useCallback(async () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
+      const res = await fetch('/api/community/my-requests', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMyRequests(data.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching my requests:', err);
+    }
+  }, []);
+
+  const fetchIncomingRequests = useCallback(async (communityId: number) => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
+      const res = await fetch(`/api/community/incoming-requests?communityId=${communityId}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIncomingRequests(data.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching incoming requests:', err);
+    }
+  }, []);
+
+  const handleRequestJoin = async (communityId: number) => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
+      const res = await fetch('/api/community/join-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify({ communityId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message || 'Join request submitted successfully!');
+        await fetchAllCommunities(communitySearchQuery);
+        await fetchMyRequests();
+      } else {
+        alert(data.message || 'Failed to submit join request');
+      }
+    } catch (err) {
+      console.error('Error requesting to join:', err);
+      alert('Error requesting to join community');
+    }
+  };
+
+  const handleApproveRequest = async (requestId: number) => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
+      const res = await fetch(`/api/community/join-request/${requestId}/approve`, {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Request approved successfully!');
+        if (communityData?.id) {
+          await fetchIncomingRequests(communityData.id);
+          await fetchMyCommunity();
+        }
+      } else {
+        alert(data.message || 'Failed to approve request');
+      }
+    } catch (err) {
+      console.error('Error approving request:', err);
+      alert('Error approving request');
+    }
+  };
+
+  const handleRejectRequest = async (requestId: number) => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
+      const res = await fetch(`/api/community/join-request/${requestId}/reject`, {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Request rejected successfully!');
+        if (communityData?.id) {
+          await fetchIncomingRequests(communityData.id);
+        }
+      } else {
+        alert(data.message || 'Failed to reject request');
+      }
+    } catch (err) {
+      console.error('Error rejecting request:', err);
+      alert('Error rejecting request');
+    }
+  };
+
+  const handleAcceptInvite = async (inviteId: number) => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
+      const res = await fetch(`/api/community/invitations/${inviteId}/accept`, {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Invitation accepted successfully!');
+        setShowAutoInviteModal(false);
+        setAutoInviteToHandle(null);
+        await fetchMyCommunity();
+        await fetchMyInvitations();
+      } else {
+        alert(data.message || 'Failed to accept invitation');
+      }
+    } catch (err) {
+      console.error('Error accepting invitation:', err);
+      alert('Error accepting invitation');
+    }
+  };
+
+  const handleRejectInvite = async (inviteId: number) => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
+      const res = await fetch(`/api/community/invitations/${inviteId}/reject`, {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Invitation rejected successfully!');
+        setShowAutoInviteModal(false);
+        setAutoInviteToHandle(null);
+        await fetchMyInvitations();
+      } else {
+        alert(data.message || 'Failed to reject invitation');
+      }
+    } catch (err) {
+      console.error('Error rejecting invitation:', err);
+      alert('Error rejecting invitation');
+    }
+  };
+
   const fetchDashboardStats = useCallback(async (communityId?: number) => {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
-      const targetId = communityId || communityData?.id;
+      const targetId = communityId || communityDataRef.current?.id;
       const url = targetId ? `/api/community/dashboard?communityId=${targetId}` : '/api/community/dashboard';
       const res = await fetch(url, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
@@ -308,7 +518,7 @@ export default function ChatPage() {
     } catch (err) {
       console.error('Error fetching dashboard stats:', err);
     }
-  }, [communityData]);
+  }, []);
 
   // Fetch Community Info
   const fetchMyCommunity = useCallback(async () => {
@@ -334,14 +544,18 @@ export default function ChatPage() {
             fetchDashboardStats(json.communities[0].id);
             return json.communities[0];
           });
+          return json.communities;
         } else {
           setMyCommunities([]);
           setCommunityData(null);
           setCommunityRole(null);
+          return [];
         }
       }
+      return [];
     } catch (err) {
       console.error('Error fetching community status:', err);
+      return [];
     }
   }, [fetchDashboardStats]);
 
@@ -354,6 +568,11 @@ export default function ChatPage() {
       const json = await res.json();
       if (json.success) {
         setMyInvitations(json.invitations);
+        const pending = json.invitations.find((inv: any) => inv.status === 'PENDING');
+        if (pending) {
+          setAutoInviteToHandle(pending);
+          setShowAutoInviteModal(true);
+        }
       }
     } catch (err) {
       console.error('Error fetching invitations:', err);
@@ -899,7 +1118,7 @@ export default function ChatPage() {
     } catch (err: any) {
       console.error('Failed to fetch messages', err);
       setState('error');
-      setStatusText(err.message || 'The Nexus connection was interrupted.');
+      setStatusText(err.message || 'The Community connection was interrupted.');
     } finally {
       setMessageLoading(false);
       setIsLoadingMore(false);
@@ -1020,7 +1239,7 @@ export default function ChatPage() {
       return loaded as Conversation[];
     } catch (err: any) {
       console.error('Fetch conversations failed:', err);
-      throw new Error(err.message || 'The Nexus frequency is unstable. Please retry.');
+      throw new Error(err.message || 'The Community frequency is unstable. Please retry.');
     }
   }, []);
 
@@ -1053,6 +1272,8 @@ export default function ChatPage() {
       const withoutDuplicate = current.filter((item) => item.id !== conversation.id);
       return [{ ...conversation, unread: 0 }, ...withoutDuplicate];
     });
+    setViewingGalaxyLanding(false);
+    setShowCommunityDashboard(false);
     setActiveConversation(conversation);
     return conversation;
   }, [setActiveConversation]);
@@ -1188,6 +1409,43 @@ export default function ChatPage() {
     setState('ready');
   }, [setActiveConversation]);
 
+  const handleNavigateToCommunity = useCallback(async (comm: any) => {
+    setInCommunity(true);
+    setCommunityData(comm);
+    setCommunityRole(comm.role);
+    setViewingGalaxyLanding(false);
+    setShowCommunityDashboard(true);
+
+    const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
+    try {
+      const statsRes = await fetch(`/api/community/dashboard?communityId=${comm.id}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      const statsJson = await statsRes.json();
+      if (statsJson.success) {
+        setDashboardStats(statsJson.data);
+      }
+    } catch (err) {
+      console.error('Error fetching dashboard stats:', err);
+    }
+
+    if (comm.groups && comm.groups.length > 0) {
+      const generalGroup = comm.groups.find((g: any) => g.name.toLowerCase() === 'general') || comm.groups[0];
+      const targetConv = conversations.find(c => c.id === generalGroup.conversation_id);
+      if (targetConv) {
+        setActiveConversation(targetConv);
+        await fetchMessages(targetConv.id);
+      } else {
+        const loaded = await fetchConversations();
+        const found = loaded.find(c => c.id === generalGroup.conversation_id);
+        if (found) {
+          setActiveConversation(found);
+          await fetchMessages(found.id);
+        }
+      }
+    }
+  }, [conversations, fetchConversations, fetchMessages, setActiveConversation]);
+
   useEffect(() => {
     const initialize = async () => {
       let currentUser: User | null = null;
@@ -1233,6 +1491,8 @@ export default function ChatPage() {
         const loadedConversations = await fetchConversations();
         await fetchMyCommunity();
         await fetchMyInvitations();
+        await fetchAllCommunities();
+        await fetchMyRequests();
 
         if (targetUserId) {
           const conversation = await openDirectConversation(targetUserId);
@@ -1263,15 +1523,32 @@ export default function ChatPage() {
       } catch (err: any) {
         console.error('Failed to initialize chat', err);
         setState('error');
-        setStatusText(err.message || 'Signal Error: Could not synchronize with Nexus.');
+        setStatusText(err.message || 'Signal Error: Could not synchronize with Community.');
       }
     };
 
     initialize();
-  }, [fetchConversations, fetchMessages, openDirectConversation, setActiveConversation, fetchMyCommunity, fetchMyInvitations]);
+  }, [fetchConversations, fetchMessages, openDirectConversation, setActiveConversation, fetchMyCommunity, fetchMyInvitations, fetchAllCommunities, fetchMyRequests]);
 
+  // =========================================================================
+  // FIX 1: DEDICATED PUSHER CLIENT CONNECTION DISPOSAL LIFECYCLE HOOK
+  // Handles complete websocket disconnection on unmount, layout switches, or logouts.
+  // =========================================================================
   useEffect(() => {
-    if (!user) return;
+    return () => {
+      if (pusherRef.current) {
+        pusherRef.current.disconnect();
+        pusherRef.current = null;
+      }
+    };
+  }, [user?.id]); // Fires on explicit layout unmount or session invalidation (logout)
+
+  // =========================================================================
+  // FIX 2: REFACTORED USER CHANNEL SUBSCRIPTION (DETERMINISTIC CLEANUP)
+  // =========================================================================
+  useEffect(() => {
+    const userId = user?.id;
+    if (!userId) return;
 
     if (!pusherRef.current) {
       const pusherKey = pusherConfigRef.current?.key || process.env.NEXT_PUBLIC_PUSHER_KEY;
@@ -1315,23 +1592,27 @@ export default function ChatPage() {
 
     if (!pusherRef.current) return;
 
-    const userChannelName = `user-${user.id}`;
+    const userChannelName = `user-${userId}`;
     const userChannel = pusherRef.current.subscribe(userChannelName);
 
-    userChannel.bind('credit-update', (data: { credits: number, change: number, reason: string }) => {
+    // Named reference allocation to avoid handler replication
+    const handleCreditUpdate = (data: { credits: number, change: number, reason: string }) => {
       setUser(prev => prev ? { ...prev, credits: data.credits } : null);
+    };
 
-    });
+    const handleMessageNotification = (data: any) => {
+      const msg: ChatMessage = data.message || data;
+      const convId = data.conversationId || msg.conversation_id;
+      if (!msg || !convId) return;
 
-    userChannel.bind('message-notification', (data: { conversationId: number, message: ChatMessage }) => {
       setConversations((current) => {
-        const convIndex = current.findIndex((c) => c.id === data.conversationId);
+        const convIndex = current.findIndex((c) => c.id === convId);
         if (convIndex > -1) {
           const conv = current[convIndex];
-          const isCurrentActive = activeConv?.id === data.conversationId;
+          const isCurrentActive = activeConv?.id === convId;
           const updatedConv = { 
             ...conv, 
-            messages: [data.message], 
+            messages: [msg], 
             unread: isCurrentActive ? 0 : (conv.unread || 0) + 1 
           };
           const newConvs = [...current];
@@ -1342,15 +1623,25 @@ export default function ChatPage() {
           return current;
         }
       });
-    });
+    };
 
+    // Binding reference listeners
+    userChannel.bind('credit-update', handleCreditUpdate);
+    userChannel.bind('message-notification', handleMessageNotification);
+
+    // Strict explicit event teardown block
     return () => {
-      userChannel.unbind_all();
+      userChannel.unbind('credit-update', handleCreditUpdate);
+      userChannel.unbind('message-notification', handleMessageNotification);
       pusherRef.current?.unsubscribe(userChannelName);
     };
-  }, [user, activeConv?.id, fetchConversations]);
+  }, [user?.id, activeConv?.id, fetchConversations]);
 
-  const attemptSendMessage = async (tempId: string, content: string, conversationId: number) => {
+  // =========================================================================
+  // FIX 3: REFACTORED CONVERSATION ACTIVE CHANNEL (DETERMINISTIC CLEANUP)
+  // =========================================================================
+
+  const attemptSendMessage = useCallback(async (tempId: string, content: string, conversationId: number) => {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
       const res = await fetchWithCSRF('/api/chat/messages', {
@@ -1374,13 +1665,13 @@ export default function ChatPage() {
         // Permanent error (auth, validation) - mark as failed
         if (res.status === 401 || res.status === 403 || res.status === 400) {
           setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'failed' } : m));
-          messageQueue.removeFromQueue(tempId);
+          removeFromQueue(tempId);
           setStatusText(json.message || 'Message failed to send.');
           return;
         }
         
         // Transient error - schedule retry
-        messageQueue.scheduleRetry(tempId, 0);
+        scheduleRetry(tempId, 0);
         setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'failed' } : m));
         setStatusText(json.message || 'Message send failed. Retrying...');
         return;
@@ -1388,7 +1679,7 @@ export default function ChatPage() {
 
       // Success - remove from queue and mark as sent
       setMessages(prev => prev.map(m => m.id === tempId ? { ...json.data, status: 'sent' } : m));
-      messageQueue.removeFromQueue(tempId);
+      removeFromQueue(tempId);
       
       setConversations((current) => {
         const index = current.findIndex(c => c.id === json.data.conversation_id);
@@ -1402,25 +1693,25 @@ export default function ChatPage() {
     } catch (err) {
       console.error('[MESSAGE] Failed to send message', err);
       // Network error - schedule retry
-      messageQueue.scheduleRetry(tempId, 0);
+      scheduleRetry(tempId, 0);
       setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'failed' } : m));
       setStatusText('Network error. Message will be retried.');
     } finally {
       setSending(false);
     }
-  };
+  }, [removeFromQueue, scheduleRetry, setMessages, setConversations, setSending, setStatusText]);
 
-  const processMessageQueue = async () => {
-    if (messageQueue.isProcessing() || pusherConnectionState !== 'connected') return;
+  const processMessageQueue = useCallback(async () => {
+    if (isProcessing() || pusherConnectionState !== 'connected') return;
     
-    messageQueue.setProcessing(true);
+    setProcessing(true);
     
     try {
-      let nextMessage = messageQueue.getNextMessageToRetry();
+      let nextMessage = getNextMessageToRetry();
       
       while (nextMessage) {
         const msg = nextMessage;
-        messageQueue.updateMessageStatus(msg.tempId, 'sending');
+        updateMessageStatus(msg.tempId, 'sending');
         setMessages(prev => prev.map(m => 
           m.id === msg.tempId ? { ...m, status: 'sending' } : m
         ));
@@ -1444,7 +1735,7 @@ export default function ChatPage() {
             setMessages(prev => prev.map(m => 
               m.id === msg.tempId ? { ...json.data, status: 'sent' } : m
             ));
-            messageQueue.removeFromQueue(msg.tempId);
+            removeFromQueue(msg.tempId);
             
             setConversations((current) => {
               const index = current.findIndex(c => c.id === json.data.conversation_id);
@@ -1459,11 +1750,11 @@ export default function ChatPage() {
             setMessages(prev => prev.map(m => 
               m.id === msg.tempId ? { ...m, status: 'failed' } : m
             ));
-            messageQueue.removeFromQueue(msg.tempId);
+            removeFromQueue(msg.tempId);
             break; // Stop processing on auth error
           } else {
             // Transient error
-            messageQueue.scheduleRetry(msg.tempId, msg.retryCount + 1);
+            scheduleRetry(msg.tempId, msg.retryCount + 1);
             if (msg.retryCount >= 4) {
               setMessages(prev => prev.map(m => 
                 m.id === msg.tempId ? { ...m, status: 'failed' } : m
@@ -1473,7 +1764,7 @@ export default function ChatPage() {
           }
         } catch (err) {
           console.error('[QUEUE] Error processing message:', err);
-          messageQueue.scheduleRetry(msg.tempId, msg.retryCount + 1);
+          scheduleRetry(msg.tempId, msg.retryCount + 1);
           if (msg.retryCount >= 4) {
             setMessages(prev => prev.map(m => 
               m.id === msg.tempId ? { ...m, status: 'failed' } : m
@@ -1483,7 +1774,7 @@ export default function ChatPage() {
         }
         
         // Get next message to retry
-        nextMessage = messageQueue.getNextMessageToRetry();
+        nextMessage = getNextMessageToRetry();
         
         // Small delay between retries
         if (nextMessage) {
@@ -1491,9 +1782,9 @@ export default function ChatPage() {
         }
       }
     } finally {
-      messageQueue.setProcessing(false);
+      setProcessing(false);
     }
-  };
+  }, [isProcessing, pusherConnectionState, getNextMessageToRetry, updateMessageStatus, removeFromQueue, scheduleRetry, setMessages, setConversations, setProcessing]);
 
   // Monitor Pusher connection state and process queue on reconnection
   useEffect(() => {
@@ -1516,8 +1807,7 @@ export default function ChatPage() {
     return () => {
       pusherRef.current?.connection.unbind('state_change', handleConnectionStateChange);
     };
-  }, []);
-
+  }, [processMessageQueue]); // Added processMessageQueue safely here
   useEffect(() => {
     if (!activeConv) return;
 
@@ -1565,32 +1855,37 @@ export default function ChatPage() {
 
     const channelName = `conversation-${activeConv.id}`;
     const channel = pusherRef.current.subscribe(channelName);
-    channel.bind('new-message', (data: { message: ChatMessage }) => {
-      if (activeConv.id === data.message.conversation_id) {
+
+    // Named handlers to allow precise runtime stack unbinding
+    const handleNewMessage = (data: any) => {
+      const msg: ChatMessage = data.message || data;
+      if (!msg || !msg.conversation_id) return;
+
+      if (activeConv.id === msg.conversation_id) {
         setMessages((prev) => {
           // Check if message already exists by ID
-          if (prev.find((message) => message.id === data.message.id)) return prev;
+          if (prev.find((message) => message.id === msg.id)) return prev;
           
           // Check if this is a reply to a queued message (match by tempId)
-          if (data.message.tempId) {
+          if (msg.tempId) {
             return prev.map(m => 
-              m.id === data.message.tempId || m.tempId === data.message.tempId
-                ? { ...data.message, status: 'sent' }
+              m.id === msg.tempId || m.tempId === msg.tempId
+                ? { ...msg, status: 'sent' }
                 : m
             );
           }
           
-          return [...prev, data.message];
+          return [...prev, msg];
         });
       }
       
       setConversations((current) => {
-        const convIndex = current.findIndex((c) => c.id === data.message.conversation_id);
+        const convIndex = current.findIndex((c) => c.id === msg.conversation_id);
         if (convIndex > -1) {
           const conv = current[convIndex];
           const updatedConv = { 
             ...conv, 
-            messages: [data.message],
+            messages: [msg],
             unread: activeConv.id === conv.id ? 0 : (conv.unread || 0) + 1
           };
           const newConvs = [...current];
@@ -1599,9 +1894,9 @@ export default function ChatPage() {
         }
         return current;
       });
-    });
+    };
 
-    channel.bind('user-typing', (data: { userId: number, userName: string, isTyping: boolean }) => {
+    const handleUserTyping = (data: { userId: number, userName: string, isTyping: boolean }) => {
       if (data.userId === user?.id) return;
       setTypingUsers(prev => {
         const next = { ...prev };
@@ -1609,9 +1904,9 @@ export default function ChatPage() {
         else delete next[data.userId];
         return next;
       });
-    });
+    };
 
-    channel.bind('task-update', (data: { type: string, task: Task, taskId?: number }) => {
+    const handleTaskUpdate = (data: { type: string, task: Task, taskId?: number }) => {
       if (data.type === 'TASK_CREATED') {
         setTasks(prev => [data.task, ...prev]);
       } else if (data.type === 'TASK_UPDATED' || data.type === 'TASK_APPROVED') {
@@ -1619,14 +1914,21 @@ export default function ChatPage() {
       } else if (data.type === 'TASK_DELETED') {
         setTasks(prev => prev.filter(t => t.id !== data.taskId));
       }
-    });
+    };
 
+    // Binding reference handlers
+    channel.bind('new-message', handleNewMessage);
+    channel.bind('user-typing', handleUserTyping);
+    channel.bind('task-update', handleTaskUpdate);
+
+    // Explicit channel and handler teardown phase
     return () => {
-      channel.unbind_all();
+      channel.unbind('new-message', handleNewMessage);
+      channel.unbind('user-typing', handleUserTyping);
+      channel.unbind('task-update', handleTaskUpdate);
       pusherRef.current?.unsubscribe(channelName);
     };
   }, [activeConv, user?.id]);
-
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, messageLoading]);
@@ -1701,13 +2003,13 @@ export default function ChatPage() {
     };
 
     // Add to queue
-    messageQueue.addToQueue(queuedMessage);
+    addToQueue(queuedMessage);
 
     // If connected, attempt send immediately; otherwise mark as pending
     if (pusherConnectionState === 'connected') {
       await attemptSendMessage(tempId, content, activeConv.id);
     } else {
-      messageQueue.updateMessageStatus(tempId, 'pending');
+      updateMessageStatus(tempId, 'pending');
       setSending(false);
       setStatusText('Message queued. Will send when connection is restored.');
     }
@@ -1715,24 +2017,24 @@ export default function ChatPage() {
 
   // Periodic retry check for queued messages
   useEffect(() => {
-    if (!user || pusherConnectionState !== 'connected') return;
+    if (!user?.id || pusherConnectionState !== 'connected' || messageLoading) return;
     
     const interval = setInterval(() => {
-      const nextMessage = messageQueue.getNextMessageToRetry();
+      if (messageLoading) return;
+      const nextMessage = getNextMessageToRetry();
       if (nextMessage) {
         processMessageQueue();
       }
     }, 2000); // Check every 2 seconds
     
     return () => clearInterval(interval);
-  }, [user, pusherConnectionState, messageQueue.queue]);
+  }, [user?.id, pusherConnectionState, getNextMessageToRetry, processMessageQueue, messageLoading]);
 
   if (state === 'loading') return <div className="chat-loading">{statusText}</div>;
 
   return (
     <div className="chat-page">
       <header className="global-header">
-        <a href="/" className="logo">TAKE <span>ONE</span></a>
         <nav>
           <a href="/#explore">Discover Projects</a>
           <a href="/crew">Find Crew</a>
@@ -1750,10 +2052,105 @@ export default function ChatPage() {
       </header>
 
       <div className="chat-container">
+        {/* Community Switcher Rail */}
+        <div className="community-rail">
+          {/* Community Global Icon */}
+          <div className={`rail-item-wrapper ${!inCommunity && !viewingGalaxyLanding ? 'active' : ''}`}>
+            <div className="rail-pill" />
+            <button 
+              className="rail-item" 
+              onClick={() => {
+                setInCommunity(false);
+                setViewingGalaxyLanding(false);
+                setShowCommunityDashboard(false);
+              }}
+              title="Community Global Chat"
+            >
+              N
+            </button>
+          </div>
+
+          <div className="rail-separator" />
+
+          {/* User's joined communities */}
+          {myCommunities.map((comm) => {
+            const isActive = inCommunity && communityData?.id === comm.id && !viewingGalaxyLanding;
+            const initials = comm.name.charAt(0).toUpperCase();
+            return (
+              <div key={comm.id} className={`rail-item-wrapper ${isActive ? 'active' : ''}`}>
+                <div className="rail-pill" />
+                <button 
+                  className="rail-item" 
+                  onClick={() => handleNavigateToCommunity(comm)}
+                  title={comm.name}
+                >
+                  {comm.logo_url ? (
+                    <img src={comm.logo_url} alt={comm.name} />
+                  ) : (
+                    initials
+                  )}
+                </button>
+              </div>
+            );
+          })}
+
+          <div className="rail-separator" />
+
+          {/* Galaxy Landing / Find Communities Button */}
+          <div className={`rail-item-wrapper ${viewingGalaxyLanding ? 'active' : ''}`}>
+            <div className="rail-pill" />
+            <button 
+              className="rail-item" 
+              onClick={() => {
+                setViewingGalaxyLanding(true);
+                fetchAllCommunities(communitySearchQuery);
+              }}
+              style={{ fontSize: '20px' }}
+              title="Explore Galaxy Communities"
+            >
+              🌌
+            </button>
+          </div>
+
+          {/* My Requests Dashboard Button */}
+          <div className="rail-item-wrapper">
+            <button 
+              className="rail-item" 
+              onClick={() => {
+                fetchMyRequests();
+                setIsJoinRequestModalOpen(true);
+              }}
+              style={{ fontSize: '20px' }}
+              title="My Community Requests"
+            >
+              📋
+            </button>
+          </div>
+        </div>
+
         <aside className="chat-sidebar">
           <div className="sidebar-header">
             <div className="sidebar-title-row">
-              <h2>Nexus</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2>NEXUS</h2>
+                <div 
+                  className={`connection-indicator ${pusherConnectionState}`}
+                  title={`Community Connection: ${pusherConnectionState}`}
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: pusherConnectionState === 'connected' ? '#00ff88' : pusherConnectionState === 'connecting' ? '#ffa620' : '#ff3232',
+                    boxShadow: pusherConnectionState === 'connected' 
+                      ? '0 0 8px #00ff88' 
+                      : pusherConnectionState === 'connecting' 
+                        ? '0 0 8px #ffa620' 
+                        : '0 0 8px #ff3232',
+                    transition: 'all 0.3s ease',
+                    animation: pusherConnectionState === 'connecting' ? 'pulse-opacity 1.5s infinite' : 'none'
+                  }}
+                />
+              </div>
               <div style={{ display: 'flex', gap: '6px' }}>
                 <button onClick={() => setIsGroupModalOpen(true)} className="nav-cta group-add-btn" aria-label="Create Group" title="Create Group">+</button>
               </div>
@@ -1761,28 +2158,28 @@ export default function ChatPage() {
 
             <div className="sidebar-tabs" style={{ display: 'flex', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', marginTop: '12px', marginBottom: '8px' }}>
               <button 
-                onClick={() => { setShowCommunityDashboard(false); }} 
-                className={`tab-btn ${!showCommunityDashboard ? 'active' : ''}`}
-                style={{ flex: 1, padding: '8px', background: !showCommunityDashboard ? 'rgba(255,77,26,0.1)' : 'transparent', border: 'none', color: '#fff', borderBottom: !showCommunityDashboard ? '2px solid var(--neon)' : 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}
+                onClick={() => { 
+                  setViewingGalaxyLanding(false); 
+                  setShowCommunityDashboard(false); 
+                }} 
+                className={`tab-btn ${!viewingGalaxyLanding && !showCommunityDashboard ? 'active' : ''}`}
+                style={{ flex: 1, padding: '8px', background: (!viewingGalaxyLanding && !showCommunityDashboard) ? 'rgba(255,77,26,0.1)' : 'transparent', border: 'none', color: '#fff', borderBottom: (!viewingGalaxyLanding && !showCommunityDashboard) ? '2px solid var(--neon)' : 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}
               >
                 Chats
               </button>
               <button 
                 onClick={() => {
-                  if (inCommunity) {
-                    setShowCommunityDashboard(true);
-                    fetchDashboardStats();
-                  } else {
-                    if (!isFounder) {
-                      fetchPricingConfigs();
-                    }
-                    setIsCommunityModalOpen(true);
+                  const targetState = !viewingGalaxyLanding;
+                  setViewingGalaxyLanding(targetState);
+                  setShowCommunityDashboard(false);
+                  if (targetState) {
+                    fetchAllCommunities(communitySearchQuery);
                   }
                 }} 
-                className={`tab-btn ${showCommunityDashboard ? 'active' : ''}`}
-                style={{ flex: 1, padding: '8px', background: showCommunityDashboard ? 'rgba(255,77,26,0.1)' : 'transparent', border: 'none', color: '#fff', borderBottom: showCommunityDashboard ? '2px solid var(--neon)' : 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}
+                className={`tab-btn ${viewingGalaxyLanding ? 'active' : ''}`}
+                style={{ flex: 1, padding: '8px', background: viewingGalaxyLanding ? 'rgba(255,77,26,0.1)' : 'transparent', border: 'none', color: '#fff', borderBottom: viewingGalaxyLanding ? '2px solid var(--neon)' : 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}
               >
-                {inCommunity ? (communityData?.name || 'Community') : 'Community'}
+                Community
               </button>
             </div>
 
@@ -1792,7 +2189,7 @@ export default function ChatPage() {
                 <input 
                   type="text" 
                   className="sidebar-search-input" 
-                  placeholder="Search Nexus..." 
+                  placeholder="Search Community..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -2104,6 +2501,8 @@ export default function ChatPage() {
                     type="button"
                     className={`conversation-item ${activeConv?.id === conv.id ? 'active' : ''}`}
                     onClick={() => {
+                      setViewingGalaxyLanding(false);
+                      setShowCommunityDashboard(false);
                       setActiveConversation(conv);
                       fetchMessages(conv.id);
                     }}
@@ -2146,7 +2545,194 @@ export default function ChatPage() {
         </aside>
 
         <main className="chat-window">
-          {state === 'error' || state === 'not-found' ? (
+          {viewingGalaxyLanding ? (
+            <div className="galaxy-container">
+              <div className="galaxy-stars"></div>
+
+              <div className="galaxy-main-view">
+                {/* Left side: Discover Communities list */}
+                <div className="galaxy-card">
+                  <h2 style={{ fontFamily: 'Bebas Neue', fontSize: '28px', color: 'var(--cream)', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                    🌌 Discover Communities
+                  </h2>
+                  <p style={{ fontSize: '13px', color: '#888', marginBottom: '20px' }}>
+                    Browse available communities or request to join.
+                  </p>
+
+                  <div className="sidebar-search-wrap" style={{ marginBottom: '20px' }}>
+                    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input 
+                      type="text" 
+                      className="sidebar-search-input" 
+                      placeholder="Search available communities..." 
+                      value={communitySearchQuery}
+                      onChange={(e) => {
+                        setCommunitySearchQuery(e.target.value);
+                        fetchAllCommunities(e.target.value);
+                      }}
+                    />
+                  </div>
+
+                  {allCommunitiesLoading ? (
+                    <div style={{ color: 'var(--neon)', fontSize: '12px', textAlign: 'center', padding: '20px' }}>Loading systems...</div>
+                  ) : (
+                    <div className="community-grid-list">
+                      {allCommunities.map((comm) => {
+                        const status = comm.joinStatus; // PENDING, ACCEPTED, REJECTED or null
+                        const isMember = myCommunities.some(c => c.id === comm.id);
+
+                        return (
+                          <div key={comm.id} className="community-card-item">
+                            <div className="community-card-info">
+                              {comm.avatar_url ? (
+                                <img src={comm.avatar_url} alt="" className="community-card-logo" />
+                              ) : (
+                                <div className="community-card-initials">
+                                  {comm.name.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <div>
+                                <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', color: 'var(--cream)', fontWeight: 'bold' }}>
+                                  {comm.name}
+                                </h3>
+                                <p style={{ margin: 0, fontSize: '12px', color: '#aaa', lineHeight: '1.4' }}>
+                                  {comm.description || 'No description provided.'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div>
+                              {isMember ? (
+                                <span className="request-badge accepted">Joined</span>
+                              ) : status === 'PENDING' ? (
+                                <span className="request-badge pending">Pending Request</span>
+                              ) : status === 'REJECTED' ? (
+                                <span className="request-badge rejected">Rejected</span>
+                              ) : (
+                                <button 
+                                  onClick={() => handleRequestJoin(comm.id)}
+                                  className="nav-cta"
+                                  style={{ padding: '6px 16px', fontSize: '11px', borderRadius: '4px' }}
+                                >
+                                  Join
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {allCommunities.length === 0 && (
+                        <div style={{ color: '#666', fontSize: '12px', textAlign: 'center', padding: '20px' }}>No communities found.</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right side: Subscription pricing tiers selector */}
+                <div className="galaxy-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <h2 style={{ fontFamily: 'Bebas Neue', fontSize: '28px', color: 'var(--cream)', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                      💳 Select a Subscription Plan
+                    </h2>
+                    <p style={{ fontSize: '13px', color: '#888', marginBottom: '24px' }}>
+                      Choose the plan that suits your creative goals. Every community is billed on a standard 3-month cycle.
+                    </p>
+
+                    <div className="pricing-cards">
+                      <div 
+                        className={`pricing-card ${selectedPlan === 'Starter' ? 'selected' : ''}`}
+                        onClick={() => {
+                          setSelectedPlan('Starter');
+                          if (!isFounder) {
+                            fetchPricingConfigs();
+                          }
+                          setIsCommunityModalOpen(true);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <div>
+                          <h3>Starter</h3>
+                          <div className="price">₹{pricingConfigs.find(c => c.plan_type === 'Starter')?.base_price || '59'}</div>
+                          <div className="duration">Per 3 Months</div>
+                        </div>
+                        <ul className="features" style={{ marginTop: '16px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <li>✓ 20 Members limit</li>
+                          <li>✓ Standard group posting</li>
+                          <li>✓ Basic script sharing</li>
+                          <li>✓ Group chat channels</li>
+                        </ul>
+                      </div>
+
+                      <div 
+                        className={`pricing-card ${selectedPlan === 'Growth' ? 'selected' : ''}`}
+                        onClick={() => {
+                          setSelectedPlan('Growth');
+                          if (!isFounder) {
+                            fetchPricingConfigs();
+                          }
+                          setIsCommunityModalOpen(true);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <div>
+                          <h3>Growth</h3>
+                          <div className="price">₹{pricingConfigs.find(c => c.plan_type === 'Growth')?.base_price || '99'}</div>
+                          <div className="duration">Per 3 Months</div>
+                        </div>
+                        <ul className="features" style={{ marginTop: '16px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <li>✓ 35 Members limit</li>
+                          <li>✓ Custom member roles</li>
+                          <li>✓ Priority feedback channel</li>
+                          <li>✓ Advanced group moderation</li>
+                        </ul>
+                      </div>
+
+                      <div 
+                        className={`pricing-card ${selectedPlan === 'Custom' ? 'selected' : ''}`}
+                        onClick={() => {
+                          setSelectedPlan('Custom');
+                          if (!isFounder) {
+                            fetchPricingConfigs();
+                          }
+                          setIsCommunityModalOpen(true);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <div>
+                          <h3>Custom</h3>
+                          <div className="price">
+                            ₹{(() => {
+                              const customCfg = pricingConfigs.find(c => c.plan_type === 'Custom');
+                              const base = customCfg ? Number(customCfg.base_price) : 99;
+                              const per = customCfg ? Number(customCfg.per_member_price) : 2;
+                              return base + (50 * per); // Default calculated for 50 members (₹199)
+                            })()}*
+                          </div>
+                          <div className="duration">Per 3 Months</div>
+                        </div>
+                        <ul className="features" style={{ marginTop: '16px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <li>✓ Dynamic member scaling</li>
+                          <li>✓ ₹99 Base + ₹2 / member</li>
+                          <li>✓ Scale up to 1000 members</li>
+                          <li>✓ Dedicated support agent</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: '30px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#888', marginBottom: '12px' }}>
+                      <span>Standard Billing Interval:</span>
+                      <span style={{ color: 'var(--neon)', fontWeight: 'bold' }}>3 Months</span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#666', lineHeight: '1.4' }}>
+                      * Billed automatically every 3 months. Cancel anytime. Rates include all taxes.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : state === 'error' || state === 'not-found' ? (
             <div className="chat-empty">
               <div className="empty-kicker">{state === 'not-found' ? 'Conversation Not Found' : 'Signal Error'}</div>
               <h3>Channel Unavailable</h3>
@@ -3020,6 +3606,178 @@ export default function ChatPage() {
                 {groupLoading ? 'Creating...' : 'Create Group'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isJoinRequestModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1010, backdropFilter: 'blur(8px)' }}>
+          <div style={{ background: '#121212', border: '1px solid rgba(255, 77, 26, 0.3)', borderRadius: '12px', padding: '24px', width: '600px', maxWidth: '90%', display: 'flex', flexDirection: 'column', gap: '20px', color: '#fff', boxShadow: '0 8px 32px rgba(255, 77, 26, 0.15)', maxHeight: '80vh' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--neon)', fontFamily: 'Bebas Neue', letterSpacing: '0.05em' }}>
+                📋 My Community Requests
+              </h2>
+              <button 
+                onClick={() => setIsJoinRequestModalOpen(false)} 
+                style={{ background: 'transparent', border: 'none', color: '#aaa', fontSize: '18px', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+              {/* PENDING REQUESTS */}
+              <div>
+                <h3 style={{ fontSize: '14px', textTransform: 'uppercase', color: 'var(--neon)', borderBottom: '1px solid rgba(255,77,26,0.2)', paddingBottom: '6px', marginBottom: '12px' }}>
+                  Pending Requests
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {myRequests.filter(r => r.status === 'PENDING').map(req => (
+                    <div key={req.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)', padding: '10px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {req.community?.avatar_url ? (
+                          <img src={req.community.avatar_url} alt="" style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'rgba(255,77,26,0.1)', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '14px', fontWeight: 'bold', color: 'var(--neon)' }}>
+                            {req.community?.name?.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div>
+                          <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{req.community?.name}</div>
+                          <div style={{ fontSize: '11px', color: '#888' }}>Requested: {new Date(req.createdAt).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                      <span className="request-badge pending" style={{ fontSize: '11px', padding: '4px 8px' }}>Pending</span>
+                    </div>
+                  ))}
+                  {myRequests.filter(r => r.status === 'PENDING').length === 0 && (
+                    <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>No pending requests.</div>
+                  )}
+                </div>
+              </div>
+
+              {/* ACCEPTED REQUESTS */}
+              <div>
+                <h3 style={{ fontSize: '14px', textTransform: 'uppercase', color: '#4dff4d', borderBottom: '1px solid rgba(77,255,77,0.2)', paddingBottom: '6px', marginBottom: '12px' }}>
+                  Accepted Requests
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {myRequests.filter(r => r.status === 'ACCEPTED').map(req => (
+                    <div key={req.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)', padding: '10px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {req.community?.avatar_url ? (
+                          <img src={req.community.avatar_url} alt="" style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'rgba(77,255,77,0.1)', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '14px', fontWeight: 'bold', color: '#4dff4d' }}>
+                            {req.community?.name?.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div>
+                          <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{req.community?.name}</div>
+                          <div style={{ fontSize: '11px', color: '#888' }}>Accepted: {new Date(req.updatedAt || req.createdAt).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          setIsJoinRequestModalOpen(false);
+                          const communities = await fetchMyCommunity();
+                          if (communities && communities.length > 0) {
+                            const joined = communities.find((c: any) => c.id === req.community.id);
+                            if (joined) {
+                              handleNavigateToCommunity(joined);
+                            } else {
+                              handleNavigateToCommunity(communities[0]);
+                            }
+                          }
+                        }}
+                        className="nav-cta"
+                        style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '4px', background: '#4dff4d', color: '#000', border: 'none' }}
+                      >
+                        Join Community
+                      </button>
+                    </div>
+                  ))}
+                  {myRequests.filter(r => r.status === 'ACCEPTED').length === 0 && (
+                    <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>No accepted requests yet.</div>
+                  )}
+                </div>
+              </div>
+
+              {/* REJECTED REQUESTS */}
+              <div>
+                <h3 style={{ fontSize: '14px', textTransform: 'uppercase', color: '#ff4d4d', borderBottom: '1px solid rgba(255,77,24,0.2)', paddingBottom: '6px', marginBottom: '12px' }}>
+                  Rejected Requests
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {myRequests.filter(r => r.status === 'REJECTED').map(req => (
+                    <div key={req.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)', padding: '10px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {req.community?.avatar_url ? (
+                          <img src={req.community.avatar_url} alt="" style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'rgba(255,77,77,0.1)', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '14px', fontWeight: 'bold', color: '#ff4d4d' }}>
+                            {req.community?.name?.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div>
+                          <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{req.community?.name}</div>
+                          <div style={{ fontSize: '11px', color: '#888' }}>Rejected: {new Date(req.updatedAt || req.createdAt).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                      <span className="request-badge rejected" style={{ fontSize: '11px', padding: '4px 8px' }}>Rejected</span>
+                    </div>
+                  ))}
+                  {myRequests.filter(r => r.status === 'REJECTED').length === 0 && (
+                    <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>No rejected requests.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAutoInviteModal && autoInviteToHandle && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1020, backdropFilter: 'blur(8px)' }}>
+          <div style={{ background: '#121212', border: '1px solid var(--neon)', borderRadius: '12px', padding: '30px', width: '450px', maxWidth: '90%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px', color: '#fff', textAlign: 'center', boxShadow: '0 8px 32px rgba(255, 77, 26, 0.25)' }}>
+            <div>
+              <div style={{ fontSize: '40px', marginBottom: '16px' }}>✉️</div>
+              <h2 style={{ margin: '0 0 8px 0', fontSize: '22px', color: 'var(--cream)', fontFamily: 'Bebas Neue', letterSpacing: '0.05em' }}>
+                You're Invited!
+              </h2>
+              <p style={{ margin: 0, fontSize: '14px', color: '#aaa', lineHeight: '1.5' }}>
+                You have been invited to join the <strong>{autoInviteToHandle.community?.name}</strong> community.
+              </p>
+            </div>
+
+            {autoInviteToHandle.community?.logo_url ? (
+              <img src={autoInviteToHandle.community.logo_url} alt="" style={{ width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+            ) : (
+              <div style={{ width: '80px', height: '80px', borderRadius: '12px', background: 'rgba(255,77,26,0.1)', border: '1px solid var(--neon)', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '32px', fontWeight: 'bold', color: 'var(--neon)' }}>
+                {autoInviteToHandle.community?.name?.charAt(0).toUpperCase()}
+              </div>
+            )}
+
+            {autoInviteToHandle.inviter && (
+              <div style={{ fontSize: '13px', color: '#888', background: 'rgba(255,255,255,0.02)', padding: '8px 16px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                Invited by: <strong>{autoInviteToHandle.inviter.name}</strong> (@{autoInviteToHandle.inviter.screen_name})
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+              <button
+                onClick={() => handleRejectInvite(autoInviteToHandle.id)}
+                style={{ flex: 1, padding: '12px', borderRadius: '6px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}
+              >
+                Decline
+              </button>
+              <button
+                onClick={() => handleAcceptInvite(autoInviteToHandle.id)}
+                style={{ flex: 1, padding: '12px', borderRadius: '6px', background: 'var(--neon)', border: 'none', color: '#fff', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}
+              >
+                Accept Invite
+              </button>
+            </div>
           </div>
         </div>
       )}
