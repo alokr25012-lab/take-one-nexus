@@ -112,3 +112,190 @@ body::after {
     display: none;
   }
 }
+
+/* ==========================================
+   RESPONSIVE ENHANCEMENTS
+   Append at end of globals.css
+========================================== */
+
+/* Large Tablets */
+@media (max-width: 1024px) {
+  :root {
+    --font-scale: 0.95;
+  }
+
+  body::before,
+  body::after {
+    opacity: 0.35;
+  }
+
+  .scroll-progress {
+    height: 3px;
+  }
+}
+
+/* Tablets */
+@media (max-width: 768px) {
+  html {
+    font-size: 15px;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  body::before {
+    opacity: 0.08;
+  }
+
+  body::after {
+    background-size: 140px;
+    opacity: 0.25;
+  }
+
+  .scroll-progress {
+    height: 3px;
+  }
+
+  section,
+  .section {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  h1 {
+    font-size: clamp(2.2rem, 8vw, 4rem);
+    line-height: 1.05;
+  }
+
+  h2 {
+    font-size: clamp(1.8rem, 6vw, 3rem);
+  }
+
+  h3 {
+    font-size: clamp(1.4rem, 5vw, 2rem);
+  }
+
+  p {
+    font-size: 0.95rem;
+    line-height: 1.7;
+  }
+}
+
+/* Mobile Devices */
+@media (max-width: 640px) {
+  html {
+    font-size: 14px;
+  }
+
+  body::before {
+    display: none;
+  }
+
+  body::after {
+    background-size: 100px;
+    opacity: 0.18;
+  }
+
+  .scroll-progress {
+    height: 2px;
+  }
+
+  section,
+  .section {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 3rem;
+    padding-bottom: 3rem;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 9vw, 3rem);
+  }
+
+  h2 {
+    font-size: clamp(1.6rem, 7vw, 2.5rem);
+  }
+
+  h3 {
+    font-size: clamp(1.2rem, 5vw, 1.8rem);
+  }
+
+  p {
+    font-size: 0.9rem;
+  }
+
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+    height: auto;
+  }
+  }
+
+/* Small Phones */
+@media (max-width: 480px) {
+  html {
+    font-size: 13px;
+  }
+
+  body::after {
+    opacity: 0.12;
+  }
+
+  h1 {
+    font-size: clamp(1.8rem, 10vw, 2.6rem);
+  }
+
+  h2 {
+    font-size: clamp(1.4rem, 8vw, 2rem);
+  }
+
+  h3 {
+    font-size: clamp(1.1rem, 6vw, 1.5rem);
+  }
+
+  p {
+    line-height: 1.8;
+  }
+
+  button,
+  .btn,
+  a {
+    min-height: 44px;
+  }
+}
+
+/* Landscape Phones */
+@media (max-height: 500px) and (orientation: landscape) {
+  section,
+  .section {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 6vw, 3rem);
+  }
+}
+
+/* Touch Devices Optimization */
+@media (hover: none) and (pointer: coarse) {
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  * {
+    scroll-behavior: smooth;
+  }
+
+  body::before {
+    display: none;
+  }
+
+  .cur-dot,
+  .cur-cross {
+    display: none !important;
+  }
+}
