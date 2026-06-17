@@ -7,6 +7,7 @@ import { USER_ROLES } from '@/lib/constants';
 import Script from 'next/script';
 import { getAvatarUrl } from '@/lib/avatars';
 import './profile.css';
+import RecommendationDashboard from '@/components/RecommendationDashboard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -300,6 +301,7 @@ export default async function ProfilePage({
               <div className="content-tabs" id="profileTabs">
                 <button className="ctab active" data-tab="projects">Projects</button>
                 {isOwner && <button className="ctab"        data-tab="about">About</button>}
+                {isOwner && <button className="ctab"        data-tab="recommendations">Recommendations</button>}
                 <button className="ctab"        data-tab="collab">{isOwner ? 'Collaborate' : 'Status'}</button>
                 <button className="ctab"        data-tab="portfolio">Portfolio</button>
                 {isOwner && <button className="ctab"        data-tab="analytics">Analytics</button>}
@@ -468,6 +470,13 @@ export default async function ProfilePage({
                   </div>
                 </div>
               </div>
+
+              {/* ── RECOMMENDATIONS TAB ── */}
+              {isOwner && (
+                <div className="tab-pane" id="tab-recommendations">
+                  <RecommendationDashboard />
+                </div>
+              )}
 
               {/* ── ANALYTICS TAB ── */}
               {isOwner && (

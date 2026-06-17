@@ -1108,6 +1108,64 @@ router.get('/analytics/summary', authenticateUser, authenticatedApiLimiter, asyn
   }
 });
 
+/**
+ * GET /api/users/recommendations
+ * Rule-based personalised recommendations using role, skills, and activity.
+ */
+router.get('/recommendations', authenticateUser, authenticatedApiLimiter, async (req, res) => {
+  try {
+    const userId = Number(req.user.id);
+    const userRole = String(req.user.role || '').toLowerCase();
+    const userSkills = String(req.user.skills || '').toLowerCase();
+
+    // 1. Recommended scripts — match user role against roles_needed
+    const scriptRows = await safeQuery(
+      `SELECT s.id, s.title, s.genre, s.status, s.roles_needed,
+              u.name AS author_name, u.screen_name, u.display_preference
+       FROM scripts s
+       LEFT JOIN users u ON u.id = s.user_id
+       WHERE s.payment_verified = TRUE
+         AND s.user_id != ?
+         AND s.roles_needed LIKE ?
+       ORDER BY s.created_at DESC
+       LIMIT 5`,
+      [userId, `%${req.user.role || ''}%`]
+    );
+
+    // 2. Suggested collaborators — same role or overlapping skills
+    const collabRows = await safeQuery(
+      `SELECT id, name, screen_name, display_preference, role, college, city, avatar_url, credits
+       FROM users
+       WHERE id != ?
+         AND (role LIKE ? OR skills LIKE ?)
+       ORDER BY credits DESC
+       LIMIT 5`,
+      [userId, `%${req.user.role || ''}%`, `%${userRole}%`]
+    );
+
+    // 3. Suggested actions based on profile completeness
+    const profile = await getProfileData(userId);
+    const actions = [];
+    if (!profile?.bio) actions.push({ label: 'Add a Bio', href: '/profile?tab=about', icon: '✍' });
+    if (!profile?.skills) actions.push({ label: 'Add Skills', href: '/profile?tab=about', icon: '⚡' });
+    if (!profile?.email_verified) actions.push({ label: 'Verify Email (+150 credits)', href: '/profile', icon: '✦' });
+    if ((profile?.scripts || []).length === 0) actions.push({ label: 'Upload Your First Script', href: '/#upload', icon: '🎬' });
+    if (!profile?.portfolio) actions.push({ label: 'Add Portfolio Link', href: '/profile?tab=about', icon: '🔗' });
+
+    res.json({
+      success: true,
+      data: {
+        scripts: scriptRows.map(r => ({ ...r, author_name: getCanonicalDisplayName(r) })),
+        collaborators: collabRows.map(r => ({ ...r, displayName: getCanonicalDisplayName(r) })),
+        actions: actions.slice(0, 3)
+      }
+    });
+  } catch (error) {
+    console.error('Recommendations error:', error.message);
+    res.status(500).json({ success: false, message: 'Could not load recommendations' });
+  }
+});
+
 router.createToken = createToken;
 router.getCookieOptions = getCookieOptions;
 module.exports = router;
