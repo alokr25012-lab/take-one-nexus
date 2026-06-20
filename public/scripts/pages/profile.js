@@ -111,8 +111,12 @@ function renderSkillBadges(skills) {
         if (typeof updateStat === 'function') updateStat('skillsCount', 0);
         return;
     }
-
-    wrap.innerHTML = items.map(skill => `<span class="badge">${skill}</span>`).join('');
+    wrap.innerHTML = '';
+    items.forEach(skill => {const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = skill;
+        wrap.appendChild(badge);
+    });
     if (typeof updateStat === 'function') updateStat('skillsCount', items.length);
 }
 
