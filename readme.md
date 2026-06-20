@@ -7,7 +7,7 @@
 
   <p>
     <a href="https://take-one-nexus.vercel.app"><b>Explore the Live Platform</b></a> •
-    <a href="#-getting-started"><b>Getting Started</b></a> •
+    <a href="#getting-started"><b>Getting Started</b></a> •
     <a href="CONTRIBUTING.md"><b>Contribute</b></a>
   </p>
 
