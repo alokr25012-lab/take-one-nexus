@@ -21,7 +21,10 @@ TAKE ONE – NEXUS is actively participating in community development initiative
 To contribute during these programs, please adhere to the following workflow:
 
 ### 1. Issue Claiming & Assignment
-*   **Browse Open Issues**: Browse existing issues or open a new one if you find a bug or have a feature suggestion.
+*   **Search Before Creating**: Before opening a new issue, search the existing open and closed issues and discussions to see if the topic has already been reported or discussed.
+*   **Duplicate Issue Policy**: Duplicate issues will be closed to keep tracking clean. If your issue is a duplicate, please add your feedback or vote directly to the existing issue rather than opening a new one.
+*   **Issue Form Workflow**: New issues must be opened using our structured GitHub Issue Forms (Bug Report, Feature Request, or Security Report). Blank issues are disabled.
+*   **Real-Time Duplicate Detection**: While writing your issue's Title or Description inside the GitHub issue creation flow, GitHub will automatically scan and surface a "Potential duplicate" list above the submit button. Check this list to verify if your issue is already documented.
 *   **Request Assignment**: Comment on the issue requesting assignment. Please do not start working on an issue until a maintainer has officially assigned it to you.
 *   **Limits**: To ensure fairness, contributors will only be assigned one issue at a time. Once a PR for your assigned issue is merged or enters final review, you may request another.
 *   **Idle Timeout**: If there is no activity, draft PR, or update on an assigned issue for **3 days**, the issue may be unassigned to keep it available for other community members.

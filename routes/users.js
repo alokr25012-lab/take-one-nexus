@@ -588,8 +588,37 @@ router.get('/me', authenticateUser, async (req, res) => {
 });
 
 
-router.get('/search', authenticateUser, async (req, res) => {
+router.get('/search', async (req, res) => {
   try {
+    let loggedInUserId = null;
+    let token = null;
+
+    // 1. Check Authorization Header
+    const authHeader = req.headers.authorization || '';
+    if (authHeader.startsWith('Bearer ')) {
+      token = authHeader.slice(7);
+    }
+
+    // 2. Check Cookie
+    if (!token && req.cookies) {
+      token = req.cookies.token;
+    }
+
+    if (token) {
+      try {
+        const secret = process.env.JWT_SECRET;
+        if (secret) {
+          const decoded = jwt.verify(token, secret);
+          if (decoded && (!decoded.exp || Date.now() < decoded.exp * 1000)) {
+            req.user = decoded;
+            loggedInUserId = decoded.id;
+          }
+        }
+      } catch (error) {
+        // Ignore token verification errors for the public search endpoint
+      }
+    }
+
     const role = String(req.query.role || '').trim();
     const city = String(req.query.city || '').trim();
     const availability = String(req.query.availability || '').trim();
@@ -601,16 +630,23 @@ router.get('/search', authenticateUser, async (req, res) => {
     let countSql = `
       SELECT COUNT(*) as total
       FROM users
-      WHERE id != ?
+      WHERE 1=1
     `;
-    const countParams = [req.user.id];
+    const countParams = [];
 
     let sql = `
       SELECT id, name, email, role, college, city, bio, skills, avatar_url, gender, credits, screen_name, display_preference, social_links, created_at, email_verified, availability
       FROM users
-      WHERE id != ?
+      WHERE 1=1
     `;
-    const params = [req.user.id];
+    const params = [];
+
+    if (loggedInUserId) {
+      sql += ` AND id != ?`;
+      params.push(loggedInUserId);
+      countSql += ` AND id != ?`;
+      countParams.push(loggedInUserId);
+    }
 
     if (role) {
       sql += ` AND role LIKE ?`;
@@ -649,11 +685,23 @@ router.get('/search', authenticateUser, async (req, res) => {
     params.push(limit, offset);
 
     const rows = await safeQuery(sql, params);
-    const mappedRows = rows.map(r => ({
-      ...r,
-      name: formatDisplayName(r.name),
-      email_verified: r.email_verified === 1 || r.email_verified === true
-    }));
+    const mappedRows = rows.map(r => {
+      const formatted = {
+        ...r,
+        name: formatDisplayName(r.name),
+        email_verified: r.email_verified === 1 || r.email_verified === true
+      };
+
+      if (!loggedInUserId) {
+        // Strip sensitive fields for guests (logged-out users)
+        delete formatted.email;
+        delete formatted.phone;
+        delete formatted.phone_number;
+        delete formatted.password;
+        delete formatted.salt;
+      }
+      return formatted;
+    });
 
     res.json({
       success: true,

@@ -20,7 +20,7 @@ export async function proxy(request: NextRequest) {
   // Protected routes for all authenticated users
   const isProtectedRoute =
     pathname.startsWith('/chat') ||
-    pathname.startsWith('/profile') ||
+    (pathname.startsWith('/profile') && !request.nextUrl.searchParams.has('id')) ||
     pathname.startsWith('/developer');
 
   const isAdminRoute = pathname.startsWith('/admin');

@@ -52,7 +52,7 @@ function personCard(person) {
     avatar: person.avatar_url || initials(person.name)
   });
 
-  const verifiedBadge = (person.email_verified === true || person.email_verified === 1)
+  const verifiedBadge = (person.email_verified === true)
     ? `<span class="verified-badge-inline" title="Verified Creator" style="display:inline-flex; align-items:center; margin-left:6px; vertical-align:middle;">
         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--neon); filter:drop-shadow(0 0 3px var(--neon));">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="var(--neon)" />
@@ -242,6 +242,29 @@ async function checkCrewAuthState() {
     console.error('Crew auth state validation failed:', error);
   }
 }
+
+// Intercept guest message link clicks to display login modal
+document.getElementById('crewGrid')?.addEventListener('click', (event) => {
+  const link = event.target.closest('.crew-contact');
+  if (!link || link.classList.contains('view-profile')) return;
+
+  if (typeof API !== 'undefined' && API.auth && !API.auth.isLoggedIn()) {
+    event.preventDefault();
+    if (typeof showToast === 'function') {
+      showToast("Please log in to message crew members ✦");
+    }
+    const loginModal = document.getElementById('loginModal');
+    if (loginModal && typeof openTakeOneModal === 'function') {
+      openTakeOneModal(loginModal);
+    }
+  }
+});
+
+// Centralized post-auth hook to refresh the crew marketplace state upon successful login
+window.onAuthSuccess = (user) => {
+  loadPeople(currentPage);
+  checkCrewAuthState();
+};
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', checkCrewAuthState);
