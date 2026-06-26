@@ -55,6 +55,9 @@ model User {
   portfolio_works         PortfolioWork[]
   ratings_received        UserRating[]           @relation("UserRatingsReceived")
   ratings_given           UserRating[]           @relation("UserRatingsGiven")
+  website_offers_received WebsiteOffer[]         @relation("UserOffers")
+  website_offers_created  WebsiteOffer[]         @relation("AdminOffers")
+  website_orders          WebsiteOrder[]         @relation("UserOrders")
 
   @@index([secondary_role], map: "idx_users_secondary_role")
   @@index([email_verified], map: "idx_users_email_verified")
@@ -538,5 +541,53 @@ model UserRating {
   @@index([rated_by_id], map: "idx_ratings_rated_by_id")
   @@map("user_ratings")
 }
+
+model WebsiteOffer {
+  id                Int            @id @default(autoincrement()) @db.UnsignedInt
+  user_id           Int            @db.UnsignedInt
+  admin_id          Int            @db.UnsignedInt
+  website_type      String         @db.VarChar(100)
+  description       String?        @db.Text
+  features          Json?          // List of features included
+  price             Decimal        @db.Decimal(10, 2)
+  advance_payment   Decimal        @db.Decimal(10, 2)
+  final_payment     Decimal        @db.Decimal(10, 2)
+  timeline_days     Int            @db.UnsignedInt
+  status            String         @default("pending") @db.VarChar(50) // "pending", "accepted", "rejected", "negotiating", "completed"
+  negotiation_count Int            @default(0) @db.UnsignedInt
+  created_at        DateTime       @default(now()) @db.Timestamp(0)
+  updated_at        DateTime       @default(now()) @updatedAt @db.Timestamp(0)
+  user              User           @relation("UserOffers", fields: [user_id], references: [id], onDelete: Cascade)
+  admin             User           @relation("AdminOffers", fields: [admin_id], references: [id], onDelete: Cascade)
+  orders            WebsiteOrder[]
+
+  @@index([user_id], map: "idx_website_offers_user_id")
+  @@index([admin_id], map: "idx_website_offers_admin_id")
+  @@map("website_offers")
+}
+
+model WebsiteOrder {
+  id                          Int          @id @default(autoincrement()) @db.UnsignedInt
+  offer_id                    Int          @db.UnsignedInt
+  user_id                     Int          @db.UnsignedInt
+  razorpay_order_id_advance   String?      @unique(map: "uq_orders_rp_advance") @db.VarChar(255)
+  razorpay_payment_id_advance String?      @db.VarChar(255)
+  razorpay_order_id_final     String?      @unique(map: "uq_orders_rp_final") @db.VarChar(255)
+  razorpay_payment_id_final   String?      @db.VarChar(255)
+  advance_paid                Boolean      @default(false)
+  final_paid                  Boolean      @default(false)
+  project_status              String       @default("pending_advance") @db.VarChar(50) // "pending_advance", "in_progress", "design_review", "development", "final_review", "pending_final_payment", "completed"
+  milestones                  Json?        // List of milestones: [{"id": 1, "title": "Wireframes", "completed": false}, ...]
+  delivery_date               DateTime?    @db.Timestamp(0)
+  created_at                  DateTime     @default(now()) @db.Timestamp(0)
+  updated_at                  DateTime     @default(now()) @updatedAt @db.Timestamp(0)
+  offer                       WebsiteOffer @relation(fields: [offer_id], references: [id], onDelete: Cascade)
+  user                        User         @relation("UserOrders", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([offer_id], map: "idx_website_orders_offer_id")
+  @@index([user_id], map: "idx_website_orders_user_id")
+  @@map("website_orders")
+}
+
 
 

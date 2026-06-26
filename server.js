@@ -83,6 +83,7 @@ try {
   const communityRoutes = require('./routes/community');
   const portfolioRoutes = require('./routes/portfolio');
   const ratingRoutes = require('./routes/ratings');
+  const servicesRoutes = require('./routes/services');
 
 const PORT = process.env.PORT || 3000;
 
@@ -235,6 +236,7 @@ app.use('/api/community/verify-payment', paymentRateLimiter);
 app.use('/api/community', communityRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/ratings', ratingRoutes);
+app.use('/api/services', servicesRoutes);
 
 app.post('/api/groups/create', (req, res) => {
   res.status(403).json({

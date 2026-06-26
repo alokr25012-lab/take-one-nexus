@@ -238,6 +238,387 @@ const loadRazorpayScript = () => {
   });
 };
 
+interface OfferCardProps {
+  message: ChatMessage;
+  onAccept: (offer: any) => void;
+  onNegotiate: (offer: any) => void;
+}
+
+const OfferCard: React.FC<OfferCardProps> = ({ message, onAccept, onNegotiate }) => {
+  const match = message.content.match(/\[WEBSITE_OFFER:(\d+)\]/);
+  const offerId = match ? match[1] : null;
+  const [offer, setOffer] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (offerId) {
+      const token = localStorage.getItem('token');
+      fetch(`/api/services/offers/${offerId}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setOffer(data.data);
+          }
+          setLoading(false);
+        })
+        .catch(() => setLoading(false));
+    }
+  }, [offerId]);
+
+  if (loading) {
+    return <div className="offer-card-loading" style={{ color: '#888', padding: '10px 0', fontFamily: 'monospace' }}>Accessing proposal details...</div>;
+  }
+
+  if (!offer) {
+    return <div className="offer-card-error" style={{ color: '#ff4d1a', padding: '10px 0', fontFamily: 'monospace' }}>Proposal not found or inaccessible.</div>;
+  }
+
+  let features: string[] = [];
+  try {
+    features = typeof offer.features === 'string' ? JSON.parse(offer.features) : (offer.features || []);
+  } catch (e) {
+    features = [];
+  }
+
+  return (
+    <div className="offer-card-wrap" style={{
+      background: 'linear-gradient(135deg, rgba(20, 20, 25, 0.95), rgba(10, 10, 15, 0.95))',
+      border: '1px solid rgba(255, 77, 26, 0.2)',
+      borderRadius: '8px',
+      padding: '20px',
+      margin: '12px 0',
+      maxWidth: '450px',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+      textAlign: 'left'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px' }}>
+        <h4 style={{ margin: 0, color: 'var(--neon)', textTransform: 'uppercase', letterSpacing: '1.5px', fontSize: '13px' }}>
+          Website Development Proposal
+        </h4>
+        <span className={`status-badge status-${offer.status}`} style={{
+          fontSize: '9px',
+          textTransform: 'uppercase',
+          letterSpacing: '1px',
+          padding: '2px 8px',
+          borderRadius: '4px',
+          fontWeight: 'bold',
+          background: offer.status === 'accepted' ? 'rgba(76, 175, 80, 0.15)' : offer.status === 'rejected' ? 'rgba(244, 67, 54, 0.15)' : 'rgba(255, 152, 0, 0.15)',
+          color: offer.status === 'accepted' ? '#4CAF50' : offer.status === 'rejected' ? '#F44336' : '#FF9800',
+          border: `1px solid ${offer.status === 'accepted' ? '#4CAF50' : offer.status === 'rejected' ? '#F44336' : '#FF9800'}`
+        }}>
+          {offer.status}
+        </span>
+      </div>
+
+      <div style={{ marginBottom: '15px' }}>
+        <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Website Type</div>
+        <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#fff', marginTop: '2px' }}>{offer.website_type}</div>
+      </div>
+
+      {offer.description && (
+        <div style={{ marginBottom: '15px' }}>
+          <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Description</div>
+          <div style={{ fontSize: '13px', color: '#ccc', marginTop: '4px', lineHeight: '1.4' }}>{offer.description}</div>
+        </div>
+      )}
+
+      {features.length > 0 && (
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Key Deliverables</div>
+          <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '13px', color: '#ccc' }}>
+            {features.map((feat: string, i: number) => (
+              <li key={i} style={{ marginBottom: '4px' }}>{feat}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '15px',
+        background: 'rgba(255,255,255,0.02)',
+        padding: '12px 15px',
+        borderRadius: '6px',
+        marginBottom: '15px',
+        border: '1px solid rgba(255,255,255,0.05)'
+      }}>
+        <div>
+          <div style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase' }}>Budget (INR)</div>
+          <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--neon)', marginTop: '2px' }}>₹{Number(offer.price).toLocaleString('en-IN')}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase' }}>Timeline</div>
+          <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#fff', marginTop: '2px' }}>{offer.timeline_days} Days</div>
+        </div>
+      </div>
+
+      {offer.status === 'pending' && (
+        <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+          <button
+            onClick={() => onAccept(offer)}
+            style={{
+              flex: 1,
+              background: 'var(--neon)',
+              color: '#000',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '10px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              fontSize: '11px'
+            }}
+          >
+            Accept Proposal
+          </button>
+          <button
+            onClick={() => onNegotiate(offer)}
+            style={{
+              background: 'rgba(255,255,255,0.05)',
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '4px',
+              padding: '10px 15px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              fontSize: '11px'
+            }}
+          >
+            Negotiate
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface ProjectTrackerProps {
+  order: any;
+  onPaymentSuccess: () => void;
+}
+
+const ProjectTracker: React.FC<ProjectTrackerProps> = ({ order, onPaymentSuccess }) => {
+  const [paying, setPaying] = useState(false);
+  
+  if (!order) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: '#888' }}>
+        <h3 style={{ color: 'var(--neon)', fontSize: '16px', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '10px' }}>No Active Website Projects</h3>
+        <p style={{ fontSize: '13px', margin: 0 }}>Proposals will appear in your transmission chat history.</p>
+      </div>
+    );
+  }
+
+  let milestones: any[] = [];
+  try {
+    milestones = typeof order.milestones === 'string' ? JSON.parse(order.milestones) : (order.milestones || []);
+  } catch (e) {
+    milestones = [];
+  }
+  
+  const handlePayment = async (stage: 'advance' | 'final') => {
+    setPaying(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/services/orders/create-payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ orderId: order.id, stage })
+      });
+      const orderJson = await response.json();
+      if (!orderJson.success) {
+        alert(orderJson.message || 'Payment initiation failed');
+        setPaying(false);
+        return;
+      }
+
+      const loaded = await loadRazorpayScript();
+      if (!loaded) {
+        alert('Razorpay SDK failed to load. Are you online?');
+        setPaying(false);
+        return;
+      }
+
+      const options = {
+        key: orderJson.keyId,
+        amount: orderJson.amount,
+        currency: orderJson.currency,
+        name: 'Take One',
+        description: `${order.offer.website_type} - ${stage === 'advance' ? 'Advance Payment' : 'Final Balance'}`,
+        order_id: orderJson.orderId,
+        handler: async (response: any) => {
+          try {
+            const verifyRes = await fetch('/api/services/orders/verify-payment', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+              },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                orderId: order.id
+              })
+            });
+            const verifyJson = await verifyRes.json();
+            if (verifyJson.success) {
+              alert('Payment verified and captured successfully!');
+              onPaymentSuccess();
+            } else {
+              alert(verifyJson.message || 'Payment verification failed');
+            }
+          } catch (err) {
+            console.error(err);
+            alert('Verification request failed');
+          }
+        },
+        prefill: {
+          name: '',
+          email: ''
+        },
+        theme: {
+          color: '#ff4d1a'
+        }
+      };
+
+      const paymentObject = new (window as any).Razorpay(options);
+      paymentObject.open();
+    } catch (err) {
+      console.error(err);
+      alert('An error occurred during checkout');
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  return (
+    <div className="project-tracker-wrap" style={{ padding: '20px', color: '#fff', maxHeight: '100%', overflowY: 'auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '15px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '15px', marginBottom: '20px', alignItems: 'center' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: '18px', color: 'var(--neon)' }}>{order.offer.website_type}</h2>
+          <p style={{ margin: '5px 0 0 0', fontSize: '11px', color: '#888', fontFamily: 'monospace' }}>
+            ORDER ID: #{order.id} | Status: <span style={{ color: '#fff', textTransform: 'uppercase', fontWeight: 'bold' }}>{order.project_status.replace(/_/g, ' ')}</span>
+          </p>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {!order.advance_paid && (
+            <button
+              onClick={() => handlePayment('advance')}
+              disabled={paying}
+              style={{ background: 'var(--neon)', color: '#000', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', cursor: paying ? 'wait' : 'pointer', boxShadow: '0 0 10px rgba(255, 77, 26, 0.3)' }}
+            >
+              {paying ? 'Processing...' : `Pay Advance (50%) - ₹${Number(order.offer.advance_payment).toLocaleString('en-IN')}`}
+            </button>
+          )}
+
+          {order.advance_paid && !order.final_paid && order.project_status === 'pending_final_payment' && (
+            <button
+              onClick={() => handlePayment('final')}
+              disabled={paying}
+              style={{ background: 'var(--neon)', color: '#000', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', cursor: paying ? 'wait' : 'pointer', boxShadow: '0 0 10px rgba(255, 77, 26, 0.3)' }}
+            >
+              {paying ? 'Processing...' : `Pay Balance (50%) - ₹${Number(order.offer.final_payment).toLocaleString('en-IN')}`}
+            </button>
+          )}
+
+          {order.advance_paid && !order.final_paid && order.project_status !== 'pending_final_payment' && (
+            <span style={{ color: 'var(--neon)', fontWeight: 'bold', fontSize: '11px', border: '1px solid var(--neon)', padding: '6px 12px', borderRadius: '4px', background: 'rgba(255, 77, 26, 0.05)', letterSpacing: '0.5px' }}>
+              Advance Paid (Development In Progress)
+            </span>
+          )}
+
+          {order.final_paid && (
+            <span style={{ color: '#4CAF50', fontWeight: 'bold', fontSize: '11px', border: '1px solid #4CAF50', padding: '6px 12px', borderRadius: '4px', background: 'rgba(76, 175, 80, 0.1)', letterSpacing: '0.5px' }}>
+              Project Fully Paid ✓
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
+        <div className="galaxy-card" style={{ padding: '20px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <h3 style={{ margin: '0 0 20px 0', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1.5px', color: '#888' }}>Development Milestones</h3>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {milestones.map((m: any, idx: number) => {
+              const isActive = (order.project_status === 'in_progress' && idx === 1) || 
+                               (order.project_status === 'design_review' && idx === 1) ||
+                               (order.project_status === 'development' && idx === 2) ||
+                               (order.project_status === 'final_review' && idx === 3);
+              return (
+                <div key={m.id} style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+                  <div style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    background: m.completed ? '#4CAF50' : isActive ? 'var(--neon)' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${m.completed ? '#4CAF50' : isActive ? 'var(--neon)' : 'rgba(255,255,255,0.1)'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '11px',
+                    color: m.completed || isActive ? '#000' : '#666',
+                    fontWeight: 'bold',
+                    marginTop: '2px',
+                    boxShadow: isActive ? '0 0 8px var(--neon)' : 'none'
+                  }}>
+                    {m.completed ? '✓' : idx + 1}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ margin: 0, fontSize: '14px', color: m.completed ? '#fff' : isActive ? 'var(--neon)' : '#888', fontWeight: isActive ? 'bold' : 'normal' }}>
+                      {m.title}
+                    </h4>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                      <span style={{ fontSize: '10px', color: m.completed ? '#4CAF50' : isActive ? 'var(--neon)' : '#555', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 'bold' }}>
+                        {m.completed ? 'Completed' : isActive ? 'Active Phase' : 'Pending'}
+                      </span>
+                      {m.updated_at && (
+                        <span style={{ fontSize: '10px', color: '#444' }}>
+                          {new Date(m.updated_at).toLocaleDateString('en-IN')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="galaxy-card" style={{ padding: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', textAlign: 'center', background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.03)' }}>
+          <div>
+            <div style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Timeline</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '5px' }}>{order.offer.timeline_days} Days</div>
+          </div>
+          <div>
+            <div style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Advance Status</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '5px', color: order.advance_paid ? '#4CAF50' : '#F44336' }}>
+              {order.advance_paid ? 'PAID' : 'PENDING'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Final Status</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '5px', color: order.final_paid ? '#4CAF50' : '#F44336' }}>
+              {order.final_paid ? 'PAID' : 'PENDING'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConv, setActiveConv] = useState<Conversation | null>(null);
@@ -273,7 +654,10 @@ export default function ChatPage() {
   
 
   // Task states
-  const [activeTab, setActiveTab] = useState<'chat' | 'tasks'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'tasks' | 'project_tracker'>('chat');
+  const [activeOrder, setActiveOrder] = useState<any>(null);
+  const [negotiatingOffer, setNegotiatingOffer] = useState<any>(null);
+  const [isNegotiateModalOpen, setIsNegotiateModalOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -1217,43 +1601,6 @@ export default function ChatPage() {
     return member || null;
   }, [activeConv, user]);
 
-  const getDisplayName = useCallback((u: User | null) => {
-    if (!u) return 'Unnamed Creator';
-    const name = u.name || 'Anonymous Creator';
-    const screenName = u.screen_name || '';
-    const preference = u.display_preference || 'Real Name Only';
-    
-    if (preference === 'Screen Name Only' && screenName) return screenName;
-    if (preference === 'Both' && screenName) return `${name} • ${screenName}`;
-    return name;
-  }, []);
-
-  const getRecipient = useCallback((conv: Conversation) => {
-    const member = conv.users.find((member) => member.id !== user?.id);
-    if (!member && !conv.is_group) {
-      return { id: -1, name: 'Deleted User', role: 'Unknown', gender: 'Other' } as User;
-    }
-    return member || conv.users[0];
-  }, [user?.id]);
-
-  const setActiveConversation = useCallback((conversation: Conversation, updateUrl = true) => {
-    setActiveConv(conversation);
-    setShowMobileSidebar(false);
-    setMessages([]);
-    setTasks([]);
-    setActiveTab('chat');
-    setDetailsTab('members');
-    localStorage.setItem('take_one_last_conversation', String(conversation.id));
-
-    // Clear unread for this conversation locally
-    setConversations(prev => prev.map(c => c.id === conversation.id ? { ...c, unread: 0 } : c));
-
-    if (updateUrl && typeof window !== 'undefined') {
-      const url = `/chat?conversationId=${conversation.id}`;
-      window.history.replaceState(null, '', url);
-    }
-  }, []);
-
   const fetchMessages = useCallback(async (convId: number, beforeId: number | null = null) => {
     if (beforeId) setIsLoadingMore(true);
     else setMessageLoading(true);
@@ -1295,6 +1642,101 @@ export default function ChatPage() {
     } finally {
       setMessageLoading(false);
       setIsLoadingMore(false);
+    }
+  }, []);
+
+  const fetchActiveOrder = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/services/orders', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      const payload = await response.json();
+      if (payload.success && payload.data && payload.data.length > 0) {
+        const active = payload.data.find((o: any) => o.project_status !== 'completed') || payload.data[0];
+        setActiveOrder(active);
+      } else {
+        setActiveOrder(null);
+      }
+    } catch (err) {
+      console.error('Failed to fetch active order:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeConv && activeRecipient?.email === 'system@takeone-nexus.net.in') {
+      fetchActiveOrder();
+    } else {
+      setActiveOrder(null);
+    }
+  }, [activeConv, activeRecipient, fetchActiveOrder]);
+
+  const handleAcceptOffer = useCallback(async (offer: any) => {
+    if (!confirm('Are you sure you want to accept this proposal and initialize the project?')) return;
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/services/offers/${offer.id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ status: 'accepted' })
+      });
+      const payload = await response.json();
+      if (payload.success) {
+        alert('Proposal accepted! Access the Project Tracker tab to complete your advance payment.');
+        if (activeConv) fetchMessages(activeConv.id);
+        fetchActiveOrder();
+      } else {
+        alert(payload.message || 'Failed to accept proposal');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('An error occurred');
+    }
+  }, [activeConv, fetchMessages, fetchActiveOrder]);
+
+  const handleOpenNegotiation = useCallback((offer: any) => {
+    setNegotiatingOffer(offer);
+    setIsNegotiateModalOpen(true);
+  }, []);
+
+  const getDisplayName = useCallback((u: User | null) => {
+    if (!u) return 'Unnamed Creator';
+    if (u.email === 'system@takeone-nexus.net.in') return 'Take One';
+    const name = u.name || 'Anonymous Creator';
+    const screenName = u.screen_name || '';
+    const preference = u.display_preference || 'Real Name Only';
+    
+    if (preference === 'Screen Name Only' && screenName) return screenName;
+    if (preference === 'Both' && screenName) return `${name} • ${screenName}`;
+    return name;
+  }, []);
+
+  const getRecipient = useCallback((conv: Conversation) => {
+    const member = conv.users.find((member) => member.id !== user?.id);
+    if (!member && !conv.is_group) {
+      return { id: -1, name: 'Deleted User', role: 'Unknown', gender: 'Other' } as User;
+    }
+    return member || conv.users[0];
+  }, [user?.id]);
+
+  const setActiveConversation = useCallback((conversation: Conversation, updateUrl = true) => {
+    setActiveConv(conversation);
+    setShowMobileSidebar(false);
+    setMessages([]);
+    setTasks([]);
+    setActiveTab('chat');
+    setDetailsTab('members');
+    localStorage.setItem('take_one_last_conversation', String(conversation.id));
+
+    // Clear unread for this conversation locally
+    setConversations(prev => prev.map(c => c.id === conversation.id ? { ...c, unread: 0 } : c));
+
+    if (updateUrl && typeof window !== 'undefined') {
+      const url = `/chat?conversationId=${conversation.id}`;
+      window.history.replaceState(null, '', url);
     }
   }, []);
 
@@ -1796,19 +2238,35 @@ export default function ChatPage() {
       });
     };
 
+    const handleOrderUpdate = (data: any) => {
+      setActiveOrder((prev: any) => {
+        if (prev && prev.id === data.orderId) {
+          return {
+            ...prev,
+            project_status: data.project_status,
+            milestones: data.milestones
+          };
+        }
+        return prev;
+      });
+      fetchActiveOrder();
+    };
+
     // Binding reference listeners
     userChannel.bind('credit-update', handleCreditUpdate);
     userChannel.bind('message-notification', handleMessageNotification);
     userChannel.bind('conversation-update', handleConversationUpdate);
+    userChannel.bind('order-update', handleOrderUpdate);
 
     // Strict explicit event teardown block
     return () => {
       userChannel.unbind('credit-update', handleCreditUpdate);
       userChannel.unbind('message-notification', handleMessageNotification);
       userChannel.unbind('conversation-update', handleConversationUpdate);
+      userChannel.unbind('order-update', handleOrderUpdate);
       pusherRef.current?.unsubscribe(userChannelName);
     };
-  }, [user?.id, activeConv?.id, fetchConversations]);
+  }, [user?.id, activeConv?.id, fetchConversations, fetchActiveOrder]);
 
   // =========================================================================
   // FIX 3: REFACTORED CONVERSATION ACTIVE CHANNEL (DETERMINISTIC CLEANUP)
@@ -2998,6 +3456,17 @@ export default function ChatPage() {
                             <span className="tab-badge">{tasks.filter(t => t.status !== 'Done').length}</span>
                           )}
                         </button>
+                        {activeRecipient?.email === 'system@takeone-nexus.net.in' && (
+                          <button 
+                            className={`chat-tab ${activeTab === 'project_tracker' ? 'active' : ''}`}
+                            onClick={() => {
+                              setActiveTab('project_tracker');
+                              fetchActiveOrder();
+                            }}
+                          >
+                            Project Tracker
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -3145,9 +3614,25 @@ export default function ChatPage() {
                             </div>
                             {dateMsgs.map((msg) => (
                               <div key={msg.id} className={`message-bubble ${msg.sender_id === user?.id ? 'sent' : 'received'} ${msg.status || ''}`}>
-                                {activeConv?.is_group && msg.sender_id !== user?.id && (
-                                  <div className="msg-sender-row" style={{ display: 'flex', alignItems: 'center' }}>
-                                    <span className="msg-sender-name">{getDisplayName(msg.sender)}</span>
+                                {(activeConv?.is_group || msg.sender?.email === 'system@takeone-nexus.net.in') && msg.sender_id !== user?.id && (
+                                  <div className="msg-sender-row" style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                                    <span className="msg-sender-name" style={{ color: msg.sender?.email === 'system@takeone-nexus.net.in' ? 'var(--neon)' : 'inherit' }}>
+                                      {getDisplayName(msg.sender)}
+                                    </span>
+                                    {msg.sender?.email === 'system@takeone-nexus.net.in' && (
+                                      <span className="msg-verified-badge" style={{
+                                        background: 'rgba(255, 77, 26, 0.1)',
+                                        border: '1px solid var(--neon)',
+                                        color: 'var(--neon)',
+                                        borderRadius: '4px',
+                                        padding: '1px 5px',
+                                        fontSize: '8px',
+                                        fontWeight: 'bold',
+                                        letterSpacing: '1px',
+                                        marginLeft: '6px',
+                                        textTransform: 'uppercase'
+                                      }}>✓ Verified</span>
+                                    )}
                                     {msg.sender?.role && <span className="msg-role-badge">{msg.sender.role}</span>}
                                     {['admin', 'founder'].includes(String(msg.sender?.secondary_role || '').toLowerCase()) && (
                                       <span className="msg-director-badge" style={{
@@ -3167,7 +3652,15 @@ export default function ChatPage() {
                                   </div>
                                 )}
                                 <div className="msg-content">
-                                  {msg.content}
+                                  {msg.content && msg.content.includes('[WEBSITE_OFFER:') ? (
+                                    <OfferCard 
+                                      message={msg} 
+                                      onAccept={handleAcceptOffer} 
+                                      onNegotiate={handleOpenNegotiation} 
+                                    />
+                                  ) : (
+                                    msg.content
+                                  )}
                                   {msg.status === 'sending' && <span className="msg-status-icon sending">...</span>}
                                   {msg.status === 'failed' && (
                                     <span className="msg-status-icon error" title="Failed to send. Click to retry." onClick={() => {
@@ -3184,7 +3677,7 @@ export default function ChatPage() {
                       </>
                     )}
                   </>
-                ) : (
+                ) : activeTab === 'tasks' ? (
                   <div className="tasks-area">
                     <div className="tasks-header">
                       <h3>Active Missions</h3>
@@ -3290,6 +3783,10 @@ export default function ChatPage() {
                         })}
                       </div>
                     )}
+                  </div>
+                ) : (
+                  <div className="project-tracker-area" style={{ height: '100%', overflow: 'hidden' }}>
+                    <ProjectTracker order={activeOrder} onPaymentSuccess={fetchActiveOrder} />
                   </div>
                 )}
                 {Object.keys(typingUsers).length > 0 && activeTab === 'chat' && (
@@ -3719,6 +4216,179 @@ export default function ChatPage() {
         members={activeConv?.users || []} 
         onCreate={createTask} 
       />
+
+      {isNegotiateModalOpen && negotiatingOffer && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.85)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#0d0d12',
+            border: '1px solid rgba(255, 77, 26, 0.2)',
+            borderRadius: '8px',
+            padding: '30px',
+            width: '100%',
+            maxWidth: '480px',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.8)',
+            position: 'relative'
+          }}>
+            <h3 style={{ margin: '0 0 20px 0', color: 'var(--neon)', textTransform: 'uppercase', letterSpacing: '1.5px', fontSize: '15px' }}>
+              Propose Proposal Adjustments
+            </h3>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              const proposedBudget = parseFloat(formData.get('proposedBudget') as string);
+              const message = formData.get('message') as string;
+              const reason = formData.get('reason') as string;
+
+              if (isNaN(proposedBudget) || proposedBudget <= 0) {
+                alert('Please enter a valid budget');
+                return;
+              }
+
+              try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`/api/services/offers/${negotiatingOffer.id}/status`, {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                  },
+                  body: JSON.stringify({
+                    status: 'negotiating',
+                    proposedBudget,
+                    message,
+                    reason
+                  })
+                });
+                const payload = await response.json();
+                if (payload.success) {
+                  alert('Negotiation proposal sent!');
+                  setIsNegotiateModalOpen(false);
+                  setNegotiatingOffer(null);
+                  if (activeConv) fetchMessages(activeConv.id);
+                } else {
+                  alert(payload.message || 'Failed to submit proposal adjustments');
+                }
+              } catch (err) {
+                console.error(err);
+                alert('An error occurred');
+              }
+            }}>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Proposed Budget (INR)</label>
+                <input
+                  name="proposedBudget"
+                  type="number"
+                  required
+                  defaultValue={negotiatingOffer.price}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '4px',
+                    padding: '12px',
+                    color: '#fff',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Reason / Request</label>
+                <input
+                  name="reason"
+                  type="text"
+                  placeholder="e.g. Budget constraints, add custom animations, etc."
+                  required
+                  style={{
+                    width: '100%',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '4px',
+                    padding: '12px',
+                    color: '#fff',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '25px' }}>
+                <label style={{ display: 'block', fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Additional Message</label>
+                <textarea
+                  name="message"
+                  rows={3}
+                  placeholder="Enter a message detailing your request..."
+                  style={{
+                    width: '100%',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '4px',
+                    padding: '12px',
+                    color: '#fff',
+                    fontSize: '14px',
+                    outline: 'none',
+                    resize: 'none'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="submit"
+                  style={{
+                    flex: 1,
+                    background: 'var(--neon)',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '4px',
+                    padding: '12px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    textTransform: 'uppercase',
+                    fontSize: '11px',
+                    letterSpacing: '1px'
+                  }}
+                >
+                  Submit Adjustments
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNegotiateModalOpen(false);
+                    setNegotiatingOffer(null);
+                  }}
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    color: '#fff',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '4px',
+                    padding: '12px 20px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    textTransform: 'uppercase',
+                    fontSize: '11px',
+                    letterSpacing: '1px'
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {isCommunityModalOpen && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(8px)' }}>
