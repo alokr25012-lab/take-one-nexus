@@ -240,7 +240,7 @@ const loadRazorpayScript = () => {
 
 interface OfferCardProps {
   message: ChatMessage;
-  onAccept: (offer: any) => void;
+  onAccept: (offer: any, selectedPlan: string) => void;
   onNegotiate: (offer: any) => void;
 }
 
@@ -249,6 +249,7 @@ const OfferCard: React.FC<OfferCardProps> = ({ message, onAccept, onNegotiate })
   const offerId = match ? match[1] : null;
   const [offer, setOffer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedPlan, setSelectedPlan] = useState<'Annual' | 'Quarterly' | 'Monthly'>('Annual');
 
   useEffect(() => {
     if (offerId) {
@@ -260,6 +261,9 @@ const OfferCard: React.FC<OfferCardProps> = ({ message, onAccept, onNegotiate })
         .then(data => {
           if (data.success) {
             setOffer(data.data);
+            if (data.data.selected_maintenance_plan) {
+              setSelectedPlan(data.data.selected_maintenance_plan);
+            }
           }
           setLoading(false);
         })
@@ -282,20 +286,43 @@ const OfferCard: React.FC<OfferCardProps> = ({ message, onAccept, onNegotiate })
     features = [];
   }
 
+  let includedServices: string[] = [];
+  try {
+    includedServices = typeof offer.included_services === 'string' ? JSON.parse(offer.included_services) : (offer.included_services || []);
+  } catch (e) {
+    includedServices = ['Hosting', 'SSL Security', 'Software Updates', 'Daily Backups', 'Uptime Monitoring', 'Priority Support'];
+  }
+
+  const getPlanPrice = (plan: 'Annual' | 'Quarterly' | 'Monthly') => {
+    if (plan === 'Annual') {
+      const base = Number(offer.annual_price || 0);
+      const discount = Number(offer.annual_discount || 0);
+      return base - discount;
+    } else if (plan === 'Quarterly') {
+      return Number(offer.quarterly_price || 0);
+    } else {
+      return Number(offer.monthly_price || 0);
+    }
+  };
+
+  const currentMaintPrice = getPlanPrice(selectedPlan);
+  const totalInitialPayment = Number(offer.advance_payment) + currentMaintPrice;
+
   return (
     <div className="offer-card-wrap" style={{
-      background: 'linear-gradient(135deg, rgba(20, 20, 25, 0.95), rgba(10, 10, 15, 0.95))',
-      border: '1px solid rgba(255, 77, 26, 0.2)',
-      borderRadius: '8px',
-      padding: '20px',
-      margin: '12px 0',
-      maxWidth: '450px',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
-      textAlign: 'left'
+      background: 'linear-gradient(135deg, rgba(20, 20, 25, 0.98), rgba(10, 10, 15, 0.98))',
+      border: '1px solid rgba(255, 77, 26, 0.25)',
+      borderRadius: '12px',
+      padding: '24px',
+      margin: '16px 0',
+      maxWidth: '460px',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+      textAlign: 'left',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px' }}>
-        <h4 style={{ margin: 0, color: 'var(--neon)', textTransform: 'uppercase', letterSpacing: '1.5px', fontSize: '13px' }}>
-          Website Development Proposal
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
+        <h4 style={{ margin: 0, color: '#ff4d22', textTransform: 'uppercase', letterSpacing: '1.5px', fontSize: '13px', fontWeight: 800 }}>
+          {offer.website_type === 'Maintenance Renewal' ? 'Maintenance Renewal Offer' : 'Website Development Proposal'}
         </h4>
         <span className={`status-badge status-${offer.status}`} style={{
           fontSize: '9px',
@@ -312,22 +339,22 @@ const OfferCard: React.FC<OfferCardProps> = ({ message, onAccept, onNegotiate })
         </span>
       </div>
 
-      <div style={{ marginBottom: '15px' }}>
+      <div style={{ marginBottom: '16px' }}>
         <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Website Type</div>
-        <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#fff', marginTop: '2px' }}>{offer.website_type}</div>
+        <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff', marginTop: '2px' }}>{offer.website_type}</div>
       </div>
 
       {offer.description && (
-        <div style={{ marginBottom: '15px' }}>
+        <div style={{ marginBottom: '16px' }}>
           <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Description</div>
-          <div style={{ fontSize: '13px', color: '#ccc', marginTop: '4px', lineHeight: '1.4' }}>{offer.description}</div>
+          <div style={{ fontSize: '13.5px', color: '#ccc', marginTop: '4px', lineHeight: '1.4' }}>{offer.description}</div>
         </div>
       )}
 
       {features.length > 0 && (
         <div style={{ marginBottom: '20px' }}>
           <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Key Deliverables</div>
-          <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '13px', color: '#ccc' }}>
+          <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '13px', color: '#ccc', lineHeight: '1.5' }}>
             {features.map((feat: string, i: number) => (
               <li key={i} style={{ marginBottom: '4px' }}>{feat}</li>
             ))}
@@ -335,30 +362,469 @@ const OfferCard: React.FC<OfferCardProps> = ({ message, onAccept, onNegotiate })
         </div>
       )}
 
+      {/* Website Development Pricing Breakdown */}
+      {offer.website_type !== 'Maintenance Renewal' && (
+        <div style={{
+          background: 'rgba(255,255,255,0.02)',
+          padding: '16px',
+          borderRadius: '8px',
+          marginBottom: '20px',
+          border: '1px solid rgba(255,255,255,0.05)'
+        }}>
+          <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Development Pricing (One-time)</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+            <div>
+              <div style={{ fontSize: '9px', color: '#666', textTransform: 'uppercase' }}>Advance Dev Fee</div>
+              <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#fff', marginTop: '2px' }}>₹{Number(offer.advance_payment).toLocaleString('en-IN')}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '9px', color: '#666', textTransform: 'uppercase' }}>Final Dev Fee</div>
+              <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#fff', marginTop: '2px' }}>₹{Number(offer.final_payment).toLocaleString('en-IN')}</div>
+            </div>
+          </div>
+          <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '11px', color: '#888' }}>Total Development Cost</span>
+            <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#ff4d22' }}>₹{Number(offer.price).toLocaleString('en-IN')}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Maintenance Pricing Selectors */}
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>Website Maintenance Plan</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {/* Annual option */}
+          {offer.annual_price && (
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px 14px',
+              borderRadius: '8px',
+              border: `1px solid ${selectedPlan === 'Annual' ? '#ff4d22' : 'rgba(255,255,255,0.05)'}`,
+              background: selectedPlan === 'Annual' ? 'rgba(255, 77, 34, 0.08)' : 'rgba(255,255,255,0.01)',
+              cursor: offer.status === 'pending' ? 'pointer' : 'default',
+              transition: 'all 0.2s ease'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input
+                  type="radio"
+                  name={`maint-plan-${offer.id}`}
+                  checked={selectedPlan === 'Annual'}
+                  disabled={offer.status !== 'pending'}
+                  onChange={() => setSelectedPlan('Annual')}
+                  style={{ accentColor: '#ff4d22', cursor: 'pointer' }}
+                />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff' }}>Annual Maintenance</div>
+                  <div style={{ fontSize: '11px', color: '#888' }}>Billed every 12 months</div>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#ff4d22' }}>
+                  ₹{getPlanPrice('Annual').toLocaleString('en-IN')}/yr
+                </div>
+                {Number(offer.annual_discount || 0) > 0 && (
+                  <span style={{
+                    fontSize: '9px',
+                    background: 'rgba(76, 175, 80, 0.15)',
+                    color: '#4CAF50',
+                    padding: '1px 5px',
+                    borderRadius: '4px',
+                    fontWeight: 'bold',
+                    display: 'inline-block',
+                    marginTop: '2px'
+                  }}>
+                    Save ₹{Number(offer.annual_discount).toLocaleString('en-IN')}
+                  </span>
+                )}
+              </div>
+            </label>
+          )}
+
+          {/* Quarterly option */}
+          {offer.quarterly_price && (
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px 14px',
+              borderRadius: '8px',
+              border: `1px solid ${selectedPlan === 'Quarterly' ? '#ff4d22' : 'rgba(255,255,255,0.05)'}`,
+              background: selectedPlan === 'Quarterly' ? 'rgba(255, 77, 34, 0.08)' : 'rgba(255,255,255,0.01)',
+              cursor: offer.status === 'pending' ? 'pointer' : 'default',
+              transition: 'all 0.2s ease'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input
+                  type="radio"
+                  name={`maint-plan-${offer.id}`}
+                  checked={selectedPlan === 'Quarterly'}
+                  disabled={offer.status !== 'pending'}
+                  onChange={() => setSelectedPlan('Quarterly')}
+                  style={{ accentColor: '#ff4d22', cursor: 'pointer' }}
+                />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff' }}>Quarterly Maintenance</div>
+                  <div style={{ fontSize: '11px', color: '#888' }}>Billed every 3 months</div>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#ff4d22' }}>
+                  ₹{getPlanPrice('Quarterly').toLocaleString('en-IN')}/qt
+                </div>
+              </div>
+            </label>
+          )}
+
+          {/* Monthly option */}
+          {offer.monthly_price && (
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px 14px',
+              borderRadius: '8px',
+              border: `1px solid ${selectedPlan === 'Monthly' ? '#ff4d22' : 'rgba(255,255,255,0.05)'}`,
+              background: selectedPlan === 'Monthly' ? 'rgba(255, 77, 34, 0.08)' : 'rgba(255,255,255,0.01)',
+              cursor: offer.status === 'pending' ? 'pointer' : 'default',
+              transition: 'all 0.2s ease'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input
+                  type="radio"
+                  name={`maint-plan-${offer.id}`}
+                  checked={selectedPlan === 'Monthly'}
+                  disabled={offer.status !== 'pending'}
+                  onChange={() => setSelectedPlan('Monthly')}
+                  style={{ accentColor: '#ff4d22', cursor: 'pointer' }}
+                />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff' }}>Monthly Maintenance</div>
+                  <div style={{ fontSize: '11px', color: '#888' }}>Billed every month</div>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#ff4d22' }}>
+                  ₹{getPlanPrice('Monthly').toLocaleString('en-IN')}/mo
+                </div>
+              </div>
+            </label>
+          )}
+        </div>
+      </div>
+
+      {/* Included Services list */}
+      {includedServices.length > 0 && (
+        <div style={{ marginBottom: '20px', background: 'rgba(255,255,255,0.01)', padding: '12px 14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
+          <div style={{ fontSize: '9px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Services Included with Maintenance</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '11px', color: '#aaa' }}>
+            {includedServices.map((service, idx) => (
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: '#4CAF50', fontSize: '12px' }}>✓</span> {service}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Dynamic Payment Breakdown */}
+      {offer.status === 'pending' && (
+        <div style={{
+          background: 'linear-gradient(180deg, rgba(255, 77, 34, 0.05) 0%, rgba(255, 77, 34, 0.15) 100%)',
+          padding: '16px',
+          borderRadius: '8px',
+          border: '1px solid rgba(255, 77, 34, 0.3)',
+          marginBottom: '20px'
+        }}>
+          <div style={{ fontSize: '10px', color: '#ff8866', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', fontWeight: 'bold' }}>First Payment Breakdown</div>
+          {offer.website_type !== 'Maintenance Renewal' && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#ccc', marginBottom: '6px' }}>
+              <span>Advance Development Payment</span>
+              <span>₹{Number(offer.advance_payment).toLocaleString('en-IN')}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#ccc', marginBottom: '8px' }}>
+            <span>{selectedPlan} Maintenance Plan</span>
+            <span>₹{currentMaintPrice.toLocaleString('en-IN')}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#fff', fontWeight: 'bold', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            <span>Total Initial Due</span>
+            <span style={{ color: '#ff4d22' }}>₹{totalInitialPayment.toLocaleString('en-IN')}</span>
+          </div>
+        </div>
+      )}
+
+      {offer.status === 'pending' && (
+        <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+          <button
+            onClick={() => onAccept(offer, selectedPlan)}
+            style={{
+              flex: 1,
+              background: '#ff4d22',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '12px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              fontSize: '11px',
+              boxShadow: '0 4px 14px rgba(255, 77, 34, 0.3)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            Accept Proposal
+          </button>
+          {offer.website_type !== 'Maintenance Renewal' && (
+            <button
+              onClick={() => onNegotiate(offer)}
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: '6px',
+                padding: '12px 18px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                fontSize: '11px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              Negotiate
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface MaintenanceOfferCardProps {
+  message: ChatMessage;
+  onPaymentSuccess: () => void;
+}
+
+const MaintenanceOfferCard: React.FC<MaintenanceOfferCardProps> = ({ message, onPaymentSuccess }) => {
+  const match = message.content.match(/\[MAINTENANCE_OFFER:(\d+)\]/);
+  const maintenanceId = match ? match[1] : null;
+  const [maintenance, setMaintenance] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
+
+  const fetchMaintenance = useCallback(() => {
+    if (maintenanceId) {
+      const token = localStorage.getItem('token');
+      fetch(`/api/services/maintenance/${maintenanceId}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setMaintenance(data.data);
+          }
+          setLoading(false);
+        })
+        .catch(() => setLoading(false));
+    }
+  }, [maintenanceId]);
+
+  useEffect(() => {
+    fetchMaintenance();
+  }, [fetchMaintenance]);
+
+  const handleDecline = async () => {
+    if (!maintenance) return;
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/services/maintenance/${maintenance.id}/respond`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ status: 'declined' })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setMaintenance(data.data);
+        alert('Offer status updated: Maybe Later');
+      } else {
+        alert(data.message || 'Failed to decline proposal');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error responding to proposal');
+    }
+  };
+
+  const handlePurchase = async () => {
+    if (!maintenance) return;
+    setPaying(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/services/maintenance/${maintenance.id}/pay`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      const rpOrder = await response.json();
+      if (!rpOrder.success) {
+        alert(rpOrder.message || 'Payment failed to initiate');
+        setPaying(false);
+        return;
+      }
+
+      const loaded = await loadRazorpayScript();
+      if (!loaded) {
+        alert('Razorpay SDK failed to load');
+        setPaying(false);
+        return;
+      }
+
+      const options = {
+        key: rpOrder.keyId,
+        amount: rpOrder.amount,
+        currency: rpOrder.currency,
+        name: 'Take One',
+        description: `Annual Website Maintenance Plan`,
+        order_id: rpOrder.orderId,
+        handler: async (resp: any) => {
+          try {
+            const verifyRes = await fetch('/api/services/maintenance/verify-payment', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+              },
+              body: JSON.stringify({
+                razorpay_order_id: resp.razorpay_order_id,
+                razorpay_payment_id: resp.razorpay_payment_id,
+                razorpay_signature: resp.razorpay_signature,
+                maintenanceId: maintenance.id,
+                action: 'purchase'
+              })
+            });
+            const verifyJson = await verifyRes.json();
+            if (verifyJson.success) {
+              alert('Annual Maintenance plan activated successfully!');
+              onPaymentSuccess();
+              fetchMaintenance();
+            } else {
+              alert(verifyJson.message || 'Payment verification failed');
+            }
+          } catch (err) {
+            console.error(err);
+            alert('Verification request failed');
+          }
+        },
+        theme: {
+          color: '#ff4d1a'
+        }
+      };
+
+      const paymentObject = new (window as any).Razorpay(options);
+      paymentObject.open();
+    } catch (e) {
+      console.error(e);
+      alert('Checkout error');
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  if (loading) {
+    return <div style={{ color: '#888', padding: '10px 0', fontFamily: 'monospace' }}>Accessing maintenance offer...</div>;
+  }
+
+  if (!maintenance) {
+    return <div style={{ color: '#ff4d1a', padding: '10px 0', fontFamily: 'monospace' }}>Maintenance proposal not found.</div>;
+  }
+
+  let included: string[] = [];
+  try {
+    included = typeof maintenance.included_services === 'string'
+      ? JSON.parse(maintenance.included_services)
+      : (maintenance.included_services || []);
+  } catch (e) {
+    included = [];
+  }
+
+  return (
+    <div className="offer-card-wrap" style={{
+      background: 'linear-gradient(135deg, rgba(20, 20, 25, 0.95), rgba(10, 10, 15, 0.95))',
+      border: '1px solid rgba(255, 77, 26, 0.2)',
+      borderRadius: '8px',
+      padding: '20px',
+      margin: '12px 0',
+      maxWidth: '450px',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+      textAlign: 'left'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px' }}>
+        <h4 style={{ margin: 0, color: 'var(--neon)', textTransform: 'uppercase', letterSpacing: '1.5px', fontSize: '13px' }}>
+          Annual Maintenance Offer
+        </h4>
+        <span className={`status-badge status-${maintenance.status}`} style={{
+          fontSize: '9px',
+          textTransform: 'uppercase',
+          letterSpacing: '1px',
+          padding: '2px 8px',
+          borderRadius: '4px',
+          fontWeight: 'bold',
+          background: maintenance.status === 'active' ? 'rgba(76, 175, 80, 0.15)' : maintenance.status === 'declined' ? 'rgba(244, 67, 54, 0.15)' : 'rgba(255, 152, 0, 0.15)',
+          color: maintenance.status === 'active' ? '#4CAF50' : maintenance.status === 'declined' ? '#F44336' : '#FF9800',
+          border: `1px solid ${maintenance.status === 'active' ? '#4CAF50' : maintenance.status === 'declined' ? '#F44336' : '#FF9800'}`
+        }}>
+          {maintenance.status}
+        </span>
+      </div>
+
+      <div style={{ marginBottom: '15px', fontSize: '13px', color: '#ccc', lineHeight: '1.4' }}>
+        Get a professionally developed website with a one-time development fee. Continue worry-free with an optional annual maintenance plan covering hosting, updates, security, backups, and technical support.
+      </div>
+
+      {maintenance.description && (
+        <div style={{ marginBottom: '15px' }}>
+          <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Plan Details</div>
+          <div style={{ fontSize: '13px', color: '#ccc', marginTop: '4px', lineHeight: '1.4' }}>{maintenance.description}</div>
+        </div>
+      )}
+
+      {included.length > 0 && (
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Services Included</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px', color: '#ccc' }}>
+            {included.map((srv: string, i: number) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: 'var(--neon)' }}>✓</span> {srv}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: '15px',
         background: 'rgba(255,255,255,0.02)',
         padding: '12px 15px',
         borderRadius: '6px',
         marginBottom: '15px',
         border: '1px solid rgba(255,255,255,0.05)'
       }}>
-        <div>
-          <div style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase' }}>Budget (INR)</div>
-          <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--neon)', marginTop: '2px' }}>₹{Number(offer.price).toLocaleString('en-IN')}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase' }}>Timeline</div>
-          <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#fff', marginTop: '2px' }}>{offer.timeline_days} Days</div>
-        </div>
+        <div style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase' }}>Annual Maintenance Fee</div>
+        <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--neon)', marginTop: '2px' }}>₹{Number(maintenance.annual_price).toLocaleString('en-IN')}<span style={{ fontSize: '11px', color: '#666', fontWeight: 'normal' }}> / Year</span></div>
       </div>
 
-      {offer.status === 'pending' && (
+      {maintenance.status === 'pending' && (
         <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
           <button
-            onClick={() => onAccept(offer)}
+            onClick={handlePurchase}
+            disabled={paying}
             style={{
               flex: 1,
               background: 'var(--neon)',
@@ -367,16 +833,16 @@ const OfferCard: React.FC<OfferCardProps> = ({ message, onAccept, onNegotiate })
               borderRadius: '4px',
               padding: '10px',
               fontWeight: 'bold',
-              cursor: 'pointer',
+              cursor: paying ? 'wait' : 'pointer',
               textTransform: 'uppercase',
               letterSpacing: '1px',
               fontSize: '11px'
             }}
           >
-            Accept Proposal
+            {paying ? 'Processing...' : 'Purchase Plan'}
           </button>
           <button
-            onClick={() => onNegotiate(offer)}
+            onClick={handleDecline}
             style={{
               background: 'rgba(255,255,255,0.05)',
               color: '#fff',
@@ -390,7 +856,7 @@ const OfferCard: React.FC<OfferCardProps> = ({ message, onAccept, onNegotiate })
               fontSize: '11px'
             }}
           >
-            Negotiate
+            Maybe Later
           </button>
         </div>
       )}
@@ -405,7 +871,36 @@ interface ProjectTrackerProps {
 
 const ProjectTracker: React.FC<ProjectTrackerProps> = ({ order, onPaymentSuccess }) => {
   const [paying, setPaying] = useState(false);
+  const [activePanel, setActivePanel] = useState<'development' | 'maintenance'>('development');
   
+  const [maintenance, setMaintenance] = useState<any>(null);
+  const [loadingMaintenance, setLoadingMaintenance] = useState(false);
+  const [payingMaintenance, setPayingMaintenance] = useState(false);
+
+  const fetchMaintenance = useCallback(() => {
+    if (!order) return;
+    setLoadingMaintenance(true);
+    const token = localStorage.getItem('token');
+    fetch('/api/services/maintenance', {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          const match = data.data.find((m: any) => m.website_order_id === order.id);
+          setMaintenance(match || null);
+        }
+        setLoadingMaintenance(false);
+      })
+      .catch(() => setLoadingMaintenance(false));
+  }, [order?.id]);
+
+  useEffect(() => {
+    if (order) {
+      fetchMaintenance();
+    }
+  }, [order, fetchMaintenance]);
+
   if (!order) {
     return (
       <div style={{ padding: '40px', textAlign: 'center', color: '#888' }}>
@@ -501,120 +996,485 @@ const ProjectTracker: React.FC<ProjectTrackerProps> = ({ order, onPaymentSuccess
     }
   };
 
+  const handleRenewMaintenance = async () => {
+    if (!maintenance) return;
+    setPayingMaintenance(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/services/maintenance/${maintenance.id}/renew`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      const rpOrder = await response.json();
+      if (!rpOrder.success) {
+        alert(rpOrder.message || 'Payment initiation failed');
+        setPayingMaintenance(false);
+        return;
+      }
+
+      const loaded = await loadRazorpayScript();
+      if (!loaded) {
+        alert('Razorpay SDK failed to load');
+        setPayingMaintenance(false);
+        return;
+      }
+
+      const options = {
+        key: rpOrder.keyId,
+        amount: rpOrder.amount,
+        currency: rpOrder.currency,
+        name: 'Take One',
+        description: `${maintenance.plan_type} Website Maintenance Plan Renewal`,
+        order_id: rpOrder.orderId,
+        handler: async (resp: any) => {
+          try {
+            const verifyRes = await fetch('/api/services/maintenance/verify-payment', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+              },
+              body: JSON.stringify({
+                razorpay_order_id: resp.razorpay_order_id,
+                razorpay_payment_id: resp.razorpay_payment_id,
+                razorpay_signature: resp.razorpay_signature,
+                maintenanceId: maintenance.id,
+                action: 'renewal'
+              })
+            });
+            const verifyJson = await verifyRes.json();
+            if (verifyJson.success) {
+              alert(`${maintenance.plan_type} Maintenance plan renewed successfully!`);
+              fetchMaintenance();
+              onPaymentSuccess();
+            } else {
+              alert(verifyJson.message || 'Payment verification failed');
+            }
+          } catch (err) {
+            console.error(err);
+            alert('Verification request failed');
+          }
+        },
+        theme: {
+          color: '#ff4d1a'
+        }
+      };
+
+      const paymentObject = new (window as any).Razorpay(options);
+      paymentObject.open();
+    } catch (e) {
+      console.error(e);
+      alert('Checkout error');
+    } finally {
+      setPayingMaintenance(false);
+    }
+  };
+
+  const handlePurchaseMaintenance = async () => {
+    if (!maintenance) return;
+    setPayingMaintenance(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/services/maintenance/${maintenance.id}/pay`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      const rpOrder = await response.json();
+      if (!rpOrder.success) {
+        alert(rpOrder.message || 'Payment failed to initiate');
+        setPayingMaintenance(false);
+        return;
+      }
+
+      const loaded = await loadRazorpayScript();
+      if (!loaded) {
+        alert('Razorpay SDK failed to load');
+        setPayingMaintenance(false);
+        return;
+      }
+
+      const options = {
+        key: rpOrder.keyId,
+        amount: rpOrder.amount,
+        currency: rpOrder.currency,
+        name: 'Take One',
+        description: `${maintenance.plan_type} Website Maintenance Plan`,
+        order_id: rpOrder.orderId,
+        handler: async (resp: any) => {
+          try {
+            const verifyRes = await fetch('/api/services/maintenance/verify-payment', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+              },
+              body: JSON.stringify({
+                razorpay_order_id: resp.razorpay_order_id,
+                razorpay_payment_id: resp.razorpay_payment_id,
+                razorpay_signature: resp.razorpay_signature,
+                maintenanceId: maintenance.id,
+                action: 'purchase'
+              })
+            });
+            const verifyJson = await verifyRes.json();
+            if (verifyJson.success) {
+              alert(`${maintenance.plan_type} Maintenance plan activated successfully!`);
+              fetchMaintenance();
+              onPaymentSuccess();
+            } else {
+              alert(verifyJson.message || 'Payment verification failed');
+            }
+          } catch (err) {
+            console.error(err);
+            alert('Verification request failed');
+          }
+        },
+        theme: {
+          color: '#ff4d1a'
+        }
+      };
+
+      const paymentObject = new (window as any).Razorpay(options);
+      paymentObject.open();
+    } catch (e) {
+      console.error(e);
+      alert('Checkout error');
+    } finally {
+      setPayingMaintenance(false);
+    }
+  };
+
+  const getRemainingDays = (expiryDateStr: string) => {
+    const diff = new Date(expiryDateStr).getTime() - new Date().getTime();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  };
+
   return (
     <div className="project-tracker-wrap" style={{ padding: '20px', color: '#fff', maxHeight: '100%', overflowY: 'auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '15px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '15px', marginBottom: '20px', alignItems: 'center' }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: '18px', color: 'var(--neon)' }}>{order.offer.website_type}</h2>
-          <p style={{ margin: '5px 0 0 0', fontSize: '11px', color: '#888', fontFamily: 'monospace' }}>
-            ORDER ID: #{order.id} | Status: <span style={{ color: '#fff', textTransform: 'uppercase', fontWeight: 'bold' }}>{order.project_status.replace(/_/g, ' ')}</span>
-          </p>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {!order.advance_paid && (
-            <button
-              onClick={() => handlePayment('advance')}
-              disabled={paying}
-              style={{ background: 'var(--neon)', color: '#000', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', cursor: paying ? 'wait' : 'pointer', boxShadow: '0 0 10px rgba(255, 77, 26, 0.3)' }}
-            >
-              {paying ? 'Processing...' : `Pay Advance (50%) - ₹${Number(order.offer.advance_payment).toLocaleString('en-IN')}`}
-            </button>
-          )}
-
-          {order.advance_paid && !order.final_paid && order.project_status === 'pending_final_payment' && (
-            <button
-              onClick={() => handlePayment('final')}
-              disabled={paying}
-              style={{ background: 'var(--neon)', color: '#000', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', cursor: paying ? 'wait' : 'pointer', boxShadow: '0 0 10px rgba(255, 77, 26, 0.3)' }}
-            >
-              {paying ? 'Processing...' : `Pay Balance (50%) - ₹${Number(order.offer.final_payment).toLocaleString('en-IN')}`}
-            </button>
-          )}
-
-          {order.advance_paid && !order.final_paid && order.project_status !== 'pending_final_payment' && (
-            <span style={{ color: 'var(--neon)', fontWeight: 'bold', fontSize: '11px', border: '1px solid var(--neon)', padding: '6px 12px', borderRadius: '4px', background: 'rgba(255, 77, 26, 0.05)', letterSpacing: '0.5px' }}>
-              Advance Paid (Development In Progress)
-            </span>
-          )}
-
-          {order.final_paid && (
-            <span style={{ color: '#4CAF50', fontWeight: 'bold', fontSize: '11px', border: '1px solid #4CAF50', padding: '6px 12px', borderRadius: '4px', background: 'rgba(76, 175, 80, 0.1)', letterSpacing: '0.5px' }}>
-              Project Fully Paid ✓
-            </span>
-          )}
-        </div>
+      {/* Marketing copy banner */}
+      <div style={{
+        background: 'rgba(255, 77, 26, 0.04)',
+        border: '1px solid rgba(255, 77, 26, 0.15)',
+        borderRadius: '6px',
+        padding: '12px 15px',
+        marginBottom: '20px',
+        fontSize: '12px',
+        color: '#ccc',
+        lineHeight: '1.4',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px'
+      }}>
+        <span style={{ fontSize: '18px' }}>💡</span>
+        <span>
+          Get a professionally developed website with a one-time development fee. Continue worry-free with an optional maintenance plan covering hosting, updates, security, backups, and technical support.
+        </span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-        <div className="galaxy-card" style={{ padding: '20px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <h3 style={{ margin: '0 0 20px 0', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1.5px', color: '#888' }}>Development Milestones</h3>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {milestones.map((m: any, idx: number) => {
-              const isActive = (order.project_status === 'in_progress' && idx === 1) || 
-                               (order.project_status === 'design_review' && idx === 1) ||
-                               (order.project_status === 'development' && idx === 2) ||
-                               (order.project_status === 'final_review' && idx === 3);
-              return (
-                <div key={m.id} style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
-                  <div style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    background: m.completed ? '#4CAF50' : isActive ? 'var(--neon)' : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${m.completed ? '#4CAF50' : isActive ? 'var(--neon)' : 'rgba(255,255,255,0.1)'}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '11px',
-                    color: m.completed || isActive ? '#000' : '#666',
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '15px', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: '20px' }}>
+        <button
+          onClick={() => setActivePanel('development')}
+          style={{
+            background: 'none',
+            border: 'none',
+            borderBottom: activePanel === 'development' ? '2px solid var(--neon)' : '2px solid transparent',
+            color: activePanel === 'development' ? '#fff' : '#888',
+            padding: '10px 15px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '13px'
+          }}
+        >
+          Development Details
+        </button>
+        <button
+          onClick={() => setActivePanel('maintenance')}
+          style={{
+            background: 'none',
+            border: 'none',
+            borderBottom: activePanel === 'maintenance' ? '2px solid var(--neon)' : '2px solid transparent',
+            color: activePanel === 'maintenance' ? '#fff' : '#888',
+            padding: '10px 15px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '13px'
+          }}
+        >
+          Maintenance Subscription
+        </button>
+      </div>
+
+      {activePanel === 'development' ? (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '15px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '15px', marginBottom: '20px', alignItems: 'center' }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '18px', color: 'var(--neon)' }}>{order.offer.website_type}</h2>
+              <p style={{ margin: '5px 0 0 0', fontSize: '11px', color: '#888', fontFamily: 'monospace' }}>
+                ORDER ID: #{order.id} | Status: <span style={{ color: '#fff', textTransform: 'uppercase', fontWeight: 'bold' }}>{order.project_status.replace(/_/g, ' ')}</span>
+              </p>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              {!order.advance_paid && (
+                <button
+                  onClick={() => handlePayment('advance')}
+                  disabled={paying}
+                  style={{ background: 'var(--neon)', color: '#000', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', cursor: paying ? 'wait' : 'pointer', boxShadow: '0 0 10px rgba(255, 77, 26, 0.3)' }}
+                >
+                  {paying ? 'Processing...' : `Pay Advance - ₹${Number(order.offer.advance_payment).toLocaleString('en-IN')}`}
+                </button>
+              )}
+
+              {order.advance_paid && !order.final_paid && order.project_status === 'pending_final_payment' && (
+                <button
+                  onClick={() => handlePayment('final')}
+                  disabled={paying}
+                  style={{ background: 'var(--neon)', color: '#000', border: 'none', padding: '10px 20px', borderRadius: '4px', fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', cursor: paying ? 'wait' : 'pointer', boxShadow: '0 0 10px rgba(255, 77, 26, 0.3)' }}
+                >
+                  {paying ? 'Processing...' : `Pay Balance - ₹${Number(order.offer.final_payment).toLocaleString('en-IN')}`}
+                </button>
+              )}
+
+              {order.advance_paid && !order.final_paid && order.project_status !== 'pending_final_payment' && (
+                <span style={{ color: 'var(--neon)', fontWeight: 'bold', fontSize: '11px', border: '1px solid var(--neon)', padding: '6px 12px', borderRadius: '4px', background: 'rgba(255, 77, 26, 0.05)', letterSpacing: '0.5px' }}>
+                  Advance Paid (Development In Progress)
+                </span>
+              )}
+
+              {order.final_paid && (
+                <span style={{ color: '#4CAF50', fontWeight: 'bold', fontSize: '11px', border: '1px solid #4CAF50', padding: '6px 12px', borderRadius: '4px', background: 'rgba(76, 175, 80, 0.1)', letterSpacing: '0.5px' }}>
+                  Project Fully Paid ✓
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
+            <div className="galaxy-card" style={{ padding: '20px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <h3 style={{ margin: '0 0 20px 0', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1.5px', color: '#888' }}>Development Milestones</h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {milestones.map((m: any, idx: number) => {
+                  const isActive = (order.project_status === 'in_progress' && idx === 1) || 
+                                   (order.project_status === 'design_review' && idx === 1) ||
+                                   (order.project_status === 'development' && idx === 2) ||
+                                   (order.project_status === 'final_review' && idx === 3);
+                  return (
+                    <div key={m.id} style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+                      <div style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        background: m.completed ? '#4CAF50' : isActive ? 'var(--neon)' : 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${m.completed ? '#4CAF50' : isActive ? 'var(--neon)' : 'rgba(255,255,255,0.1)'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '11px',
+                        color: m.completed || isActive ? '#000' : '#666',
+                        fontWeight: 'bold',
+                        marginTop: '2px',
+                        boxShadow: isActive ? '0 0 8px var(--neon)' : 'none'
+                      }}>
+                        {m.completed ? '✓' : idx + 1}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <h4 style={{ margin: 0, fontSize: '14px', color: m.completed ? '#fff' : isActive ? 'var(--neon)' : '#888', fontWeight: isActive ? 'bold' : 'normal' }}>
+                          {m.title}
+                        </h4>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                          <span style={{ fontSize: '10px', color: m.completed ? '#4CAF50' : isActive ? 'var(--neon)' : '#555', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 'bold' }}>
+                            {m.completed ? 'Completed' : isActive ? 'Active Phase' : 'Pending'}
+                          </span>
+                          {m.updated_at && (
+                            <span style={{ fontSize: '10px', color: '#444' }}>
+                              {new Date(m.updated_at).toLocaleDateString('en-IN')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="galaxy-card" style={{ padding: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', textAlign: 'center', background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.03)' }}>
+              <div>
+                <div style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Timeline</div>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '5px' }}>{order.offer.timeline_days} Days</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Advance Payment</div>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '5px', color: order.advance_paid ? '#4CAF50' : '#FF9800' }}>
+                  ₹{Number(order.offer.advance_payment).toLocaleString('en-IN')}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Final Balance</div>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '5px', color: order.final_paid ? '#4CAF50' : '#FF9800' }}>
+                  ₹{Number(order.offer.final_payment).toLocaleString('en-IN')}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
+          {loadingMaintenance ? (
+            <div style={{ color: '#888', padding: '40px', textAlign: 'center', fontFamily: 'monospace' }}>
+              Retrieving maintenance subscriptions...
+            </div>
+          ) : !maintenance ? (
+            <div style={{ padding: '45px 25px', textAlign: 'center', background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: '6px' }}>
+              <div style={{ fontSize: '32px', marginBottom: '15px' }}>🛡️</div>
+              <h3 style={{ color: 'var(--neon)', fontSize: '15px', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 10px 0' }}>
+                Maintenance Not Offered Yet
+              </h3>
+              <p style={{ fontSize: '13px', color: '#aaa', margin: '0 auto', maxWidth: '400px', lineHeight: '1.5' }}>
+                Your project will be eligible for our maintenance plan once the website development has been completed.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(20, 20, 25, 0.95), rgba(10, 10, 15, 0.95))',
+                border: '1px solid rgba(255, 77, 26, 0.2)',
+                borderRadius: '8px',
+                padding: '20px',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px' }}>
+                  <h4 style={{ margin: 0, color: 'var(--neon)', textTransform: 'uppercase', letterSpacing: '1px', fontSize: '13px' }}>
+                    {maintenance.plan_type} Maintenance Plan
+                  </h4>
+                  <span className={`status-badge status-${maintenance.status}`} style={{
+                    fontSize: '9px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
                     fontWeight: 'bold',
-                    marginTop: '2px',
-                    boxShadow: isActive ? '0 0 8px var(--neon)' : 'none'
+                    background: maintenance.status === 'active' ? 'rgba(76, 175, 80, 0.15)' : maintenance.status === 'declined' ? 'rgba(244, 67, 54, 0.15)' : 'rgba(255, 152, 0, 0.15)',
+                    color: maintenance.status === 'active' ? '#4CAF50' : maintenance.status === 'declined' ? '#F44336' : '#FF9800',
+                    border: `1px solid ${maintenance.status === 'active' ? '#4CAF50' : maintenance.status === 'declined' ? '#F44336' : '#FF9800'}`
                   }}>
-                    {m.completed ? '✓' : idx + 1}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <h4 style={{ margin: 0, fontSize: '14px', color: m.completed ? '#fff' : isActive ? 'var(--neon)' : '#888', fontWeight: isActive ? 'bold' : 'normal' }}>
-                      {m.title}
-                    </h4>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                      <span style={{ fontSize: '10px', color: m.completed ? '#4CAF50' : isActive ? 'var(--neon)' : '#555', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 'bold' }}>
-                        {m.completed ? 'Completed' : isActive ? 'Active Phase' : 'Pending'}
-                      </span>
-                      {m.updated_at && (
-                        <span style={{ fontSize: '10px', color: '#444' }}>
-                          {new Date(m.updated_at).toLocaleDateString('en-IN')}
-                        </span>
-                      )}
+                    {maintenance.status}
+                  </span>
+                </div>
+
+                {maintenance.description && (
+                  <p style={{ fontSize: '13px', color: '#ccc', lineHeight: '1.4', marginBottom: '15px' }}>{maintenance.description}</p>
+                )}
+
+                {/* Included Services */}
+                {(() => {
+                  let incl: string[] = [];
+                  try {
+                    incl = typeof maintenance.included_services === 'string'
+                      ? JSON.parse(maintenance.included_services)
+                      : (maintenance.included_services || []);
+                  } catch (e) {
+                    incl = [];
+                  }
+                  if (incl.length === 0) return null;
+                  return (
+                    <div style={{ marginBottom: '20px' }}>
+                      <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Services Included</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px', color: '#ccc' }}>
+                        {incl.map((s: string, idx: number) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: 'var(--neon)' }}>✓</span> {s}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Pricing / Validity */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', background: 'rgba(255,255,255,0.02)', padding: '15px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '15px' }}>
+                  <div>
+                    <div style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase' }}>{maintenance.plan_type} Price</div>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--neon)', marginTop: '2px' }}>
+                      ₹{Number(maintenance.custom_price || maintenance.annual_price || 0).toLocaleString('en-IN')}{maintenance.plan_type === 'Annual' ? '/yr' : maintenance.plan_type === 'Quarterly' ? '/quarter' : '/mo'}
                     </div>
                   </div>
+                  {maintenance.status === 'active' && maintenance.expiry_date && (
+                    <div>
+                      <div style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase' }}>Remaining Validity</div>
+                      <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff', marginTop: '2px' }}>
+                        {getRemainingDays(maintenance.expiry_date)} Days Left
+                      </div>
+                    </div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        </div>
 
-        <div className="galaxy-card" style={{ padding: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', textAlign: 'center', background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.03)' }}>
-          <div>
-            <div style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Timeline</div>
-            <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '5px' }}>{order.offer.timeline_days} Days</div>
-          </div>
-          <div>
-            <div style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Advance Status</div>
-            <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '5px', color: order.advance_paid ? '#4CAF50' : '#F44336' }}>
-              {order.advance_paid ? 'PAID' : 'PENDING'}
+                {maintenance.status === 'active' && maintenance.start_date && maintenance.expiry_date && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#666', marginBottom: '15px', fontFamily: 'monospace' }}>
+                    <span>START: {new Date(maintenance.start_date).toLocaleDateString('en-IN')}</span>
+                    <span>EXPIRY: {new Date(maintenance.expiry_date).toLocaleDateString('en-IN')}</span>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div style={{ marginTop: '15px' }}>
+                  {(maintenance.status === 'pending' || maintenance.status === 'declined') && (
+                    <button
+                      onClick={handlePurchaseMaintenance}
+                      disabled={payingMaintenance}
+                      style={{
+                        width: '100%',
+                        background: 'var(--neon)',
+                        color: '#000',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '10px',
+                        fontWeight: 'bold',
+                        cursor: payingMaintenance ? 'wait' : 'pointer',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1px',
+                        fontSize: '11px'
+                      }}
+                    >
+                      {payingMaintenance ? 'Processing...' : `Activate ${maintenance.plan_type} Maintenance`}
+                    </button>
+                  )}
+
+                  {maintenance.status === 'active' && (
+                    <button
+                      onClick={handleRenewMaintenance}
+                      disabled={payingMaintenance}
+                      style={{
+                        width: '100%',
+                        background: 'rgba(255,255,255,0.05)',
+                        color: '#fff',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '4px',
+                        padding: '10px',
+                        fontWeight: 'bold',
+                        cursor: payingMaintenance ? 'wait' : 'pointer',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1px',
+                        fontSize: '11px'
+                      }}
+                    >
+                      {payingMaintenance ? 'Processing...' : 'Renew Subscription (Extend 1 Year)'}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-          <div>
-            <div style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Final Status</div>
-            <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '5px', color: order.final_paid ? '#4CAF50' : '#F44336' }}>
-              {order.final_paid ? 'PAID' : 'PENDING'}
-            </div>
-          </div>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -1671,8 +2531,8 @@ export default function ChatPage() {
     }
   }, [activeConv, activeRecipient, fetchActiveOrder]);
 
-  const handleAcceptOffer = useCallback(async (offer: any) => {
-    if (!confirm('Are you sure you want to accept this proposal and initialize the project?')) return;
+  const handleAcceptOffer = useCallback(async (offer: any, selectedPlan: string) => {
+    if (!confirm(`Are you sure you want to accept this proposal with the ${selectedPlan} maintenance plan?`)) return;
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`/api/services/offers/${offer.id}/status`, {
@@ -1681,7 +2541,10 @@ export default function ChatPage() {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({ status: 'accepted' })
+        body: JSON.stringify({ 
+          status: 'accepted',
+          selectedMaintenancePlan: selectedPlan
+        })
       });
       const payload = await response.json();
       if (payload.success) {
@@ -3657,6 +4520,11 @@ export default function ChatPage() {
                                       message={msg} 
                                       onAccept={handleAcceptOffer} 
                                       onNegotiate={handleOpenNegotiation} 
+                                    />
+                                  ) : msg.content && msg.content.includes('[MAINTENANCE_OFFER:') ? (
+                                    <MaintenanceOfferCard 
+                                      message={msg} 
+                                      onPaymentSuccess={fetchActiveOrder} 
                                     />
                                   ) : (
                                     msg.content
