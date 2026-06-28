@@ -29,7 +29,7 @@ export default function DeveloperIssuesPage() {
       });
       const data = await res.json();
       if (res.status === 403) {
-        setError('Access Denied. Developer Role Required.');
+        setError('Access Denied. Admin Role Required.');
         return;
       }
       if (data.success) {

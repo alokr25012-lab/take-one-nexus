@@ -1,6 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { authenticateUser, requireRole, requireVerified } = require('../middleware/auth');
+const { authenticateUser, requireRole, requireVerified, requireAdmin } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimiter');
 const prisma = require('../utils/prisma');
 
@@ -92,7 +92,7 @@ router.post('/', issuesLimiter, createIssueValidation, async (req, res) => {
  * GET /api/issues
  * Get all issues (Developer/Admin only)
  */
-router.get('/', authenticateUser, requireRole(['Developer', 'Admin']), async (req, res) => {
+router.get('/', authenticateUser, requireAdmin, async (req, res) => {
   try {
     const issues = await prisma.issue.findMany({
       orderBy: { created_at: 'desc' },
@@ -113,7 +113,7 @@ router.get('/', authenticateUser, requireRole(['Developer', 'Admin']), async (re
  * PUT /api/issues/:id
  * Update issue status, priority, and assignment
  */
-router.put('/:id', authenticateUser, requireRole(['Developer', 'Admin']), async (req, res) => {
+router.put('/:id', authenticateUser, requireAdmin, async (req, res) => {
   try {
     const id = Number(req.params.id);
     const { status, priority, assigned_admin } = req.body;
@@ -145,7 +145,7 @@ router.put('/:id', authenticateUser, requireRole(['Developer', 'Admin']), async 
  * DELETE /api/issues/:id
  * Delete an issue
  */
-router.delete('/:id', authenticateUser, requireRole(['Developer', 'Admin']), async (req, res) => {
+router.delete('/:id', authenticateUser, requireAdmin, async (req, res) => {
   try {
     const id = Number(req.params.id);
     await prisma.issue.delete({ where: { id } });

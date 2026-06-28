@@ -405,7 +405,8 @@ router.post('/', authenticateUser, requireVerified, taskCreateLimiter, taskCreat
     // - Always allowed in DMs
     // - In Groups: Only Admin, Director, or Developer (Global or Member role)
     const isLead = !conversation.is_group || 
-                   ['Admin', 'Developer'].includes(req.user.role) || 
+                   req.user.role === 'Admin' || 
+                   ['admin', 'founder'].includes(String(req.user.secondary_role || '').toLowerCase()) || 
                    ['Director', 'Admin'].includes(member.role);
 
     if (!isLead) {
@@ -485,7 +486,7 @@ router.patch('/:id', authenticateUser, requireVerified, taskLimiter, taskUpdateV
     }
 
     const isCreator = task.creator_id === userId;
-    const isAdmin = ['Admin', 'Developer'].includes(req.user.role);
+    const isAdmin = req.user.role === 'Admin' || ['admin', 'founder'].includes(String(req.user.secondary_role || '').toLowerCase());
     const isAssignee = task.assignee_id === userId;
 
     if (!isCreator && !isAdmin && !isAssignee && status) {
@@ -560,7 +561,7 @@ router.delete('/:id', authenticateUser, requireVerified, taskLimiter, [
     }
 
     const isCreator = task.creator_id === userId;
-    const isAdmin = ['Admin', 'Developer'].includes(req.user.role);
+    const isAdmin = req.user.role === 'Admin' || ['admin', 'founder'].includes(String(req.user.secondary_role || '').toLowerCase());
 
     if (!isCreator && !isAdmin) {
       return res.status(403).json({ success: false, message: 'Unauthorized. Only the mission creator or an Admin can delete missions.' });
@@ -616,7 +617,7 @@ router.post('/:id/approve', authenticateUser, requireVerified, taskLimiter, [
 
     // Check if user is authorized to approve: only creator or admin
     const isCreator = task.creator_id === userId;
-    const isAdmin = ['Admin', 'Developer'].includes(req.user.role);
+    const isAdmin = req.user.role === 'Admin' || ['admin', 'founder'].includes(String(req.user.secondary_role || '').toLowerCase());
 
     if (!isCreator && !isAdmin) {
       return res.status(403).json({ success: false, message: 'Unauthorized. Only the mission creator can approve missions and grant rewards.' });

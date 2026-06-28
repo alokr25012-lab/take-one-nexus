@@ -42,6 +42,7 @@ To support the dual-server architecture, API responsibilities are divided betwee
 | `/api/auth/reset-password` | Next.js Route Handler |
 | `/api/users/*` | Express Server |
 | `/api/chat/*` | Express Server |
+| `/api/ratings/*` | Express Server |
 | `/api/system/*` | Express Server |
 
 This separation helps contributors understand which framework is responsible for handling specific API endpoints within the application.
@@ -54,6 +55,9 @@ This separation helps contributors understand which framework is responsible for
   | `GET /api/users/me` | JWT | Session data (incl. `email_verified`) |
   | `GET /api/users/public/:id` | None | Public profile view |
   | `GET /api/chat/*` | JWT | Real-time message history |
+  | `POST /api/ratings` | JWT | Submit or edit creator rating; triggers notification on new rating, logs `profile_rated` |
+  | `GET /api/ratings/status/:userId` | JWT | Fetch rating status for a target creator, including average score and user rating |
+  | `DELETE /api/ratings/:ratedUserId` | JWT | Remove rating; logs `rating_removed` and updates statistics |
   | `GET /api/system/stats` | Admin | Live platform metrics |
 
 > **Routing Magic**: `vercel.json` rewrite rules map `/api/*` to Express while Next.js handles everything else.
@@ -62,7 +66,7 @@ This separation helps contributors understand which framework is responsible for
 - **Apex Domain**: `takeone-nexus.net.in`
 - **Admin Subdomain**: `admin.takeone-nexus.net.in`
 - **Decoupled Architecture**: The admin panel is decoupled into its own codebase, referencing the central API server.
-- **Subdomain Cookie Sharing**: Auth sessions share a common apex domain configuration: `domain: '.takeone-nexus.net.in'` on cookies. Users possessing the correct `secondary_role` permissions (e.g. `Admin`, `Developer`) can navigate to the admin console without re-authenticating.
+- **Subdomain Cookie Sharing**: Auth sessions share a common apex domain configuration: `domain: '.takeone-nexus.net.in'` on cookies. Users possessing the correct `secondary_role` permissions (e.g. `Admin`) can navigate to the admin console without re-authenticating.
 
 ---
 
@@ -190,9 +194,13 @@ Strict HTTP headers are enforced globally via Next.js configurations and Helmet 
 
 ## 8. Observability
 
+### Graphifyy Analytics
+- **Used for**: Privacy-friendly web telemetry, user engagement tracking, and page load performance insights.
+- **Privacy**: Cookies-free, lightweight tracker executing client-side with full user privacy conservation.
+
 ### PostHog (`src/lib/posthog.ts`)
-- **Used for**: Frontend analytics, session replay, feature flags.
-- **Privacy**: Input masking enabled by default. Sensitive fields (passwords, tokens, keys) are stripped from attributes prior to transmission.
+- **Used for**: Frontend behavioral analytics, session replay, and feature flags.
+- **Privacy**: Input masking enabled by default. Sensitive fields (passwords, tokens, keys) are stripped from attributes prior to transmission. Gated by GDPR cookie consent.
 
 ### Sentry (`src/lib/sentry.ts`)
 - **Used for**: Backend API failure logging, database execution error monitoring.
@@ -224,12 +232,17 @@ Pusher WebSockets drive the live creative interaction layers:
 | ADR-008 | Razorpay Webhook Signatures | Verification must use crypto raw request verification to prevent signature spoofing. |
 | ADR-009 | Double-Submit CSRF Guard | Custom cookie/header matching replaces deprecated packages for stateless CSRF mitigation. |
 | ADR-010 | Subdomain Auth Coupling | Session tokens use apex domain cookie configurations to enable subdomain SSO. |
+| ADR-011 | Rating Notifications Gate | Notifications trigger only for new ratings, avoiding notifications on edits or deletions. |
+| ADR-012 | Salted IP Hash for Ratings | Ratings analytics events use SHA-256 salted hashes of visitor IPs with JWT_SECRET for anonymity. |
+
 
 ---
 
 ## 🌐 Community & Collaboration Programs
 
-TAKE ONE Nexus is developed as a source-available filmmaking collaboration platform and participates in community-driven development initiatives including NSoC'26.
+TAKE ONE – NEXUS is developed as an open-source collaboration platform and participates in community-driven development initiatives:
+* **NSoC'26 (Nexus Spring of Code 2026)**: Supported development of the core architecture, real-time chat, security layers, and moderation modules.
+* **GSSoC'26 (GirlScript Summer of Code 2026)**: Participating to build out community discovery features, invite/request boards, and advanced crew analytics.
 
 Contributors are encouraged to explore issues, submit pull requests, improve documentation, and help build tools for filmmakers and creative teams under the project's source-available license.
 

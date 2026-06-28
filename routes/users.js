@@ -8,7 +8,7 @@ const { sendWelcomeEmail, sendVerificationEmail } = require('../utils/email');
 const prisma = require('../utils/prisma');
 const { formatDisplayName, getCanonicalDisplayName } = require('../utils/formatting');
 const Pusher = require('pusher');
-const { createRateLimiter } = require('../middleware/rateLimiter');
+const { createRateLimiter, authLimiter, uploadLimiter } = require('../middleware/rateLimiter');
 
 const { body } = require('express-validator');
 const { validateRequest } = require('../middleware/validator');
@@ -112,7 +112,7 @@ function createToken(user) {
     throw new Error('JWT_SECRET is not configured');
   }
   
-  // Ensure primary admin/dev email always has the Developer role in the session token
+  // Ensure primary roles are populated in the session token
   const role = user.role || '';
 
   return jwt.sign(
@@ -181,11 +181,28 @@ async function getProfileData(userId) {
         created_at
     FROM scripts
     WHERE user_id = ?
-    AND (
-      payment_verified = TRUE
-      OR payment_status = 'portfolio'
-    )
+    AND payment_verified = TRUE
+    AND (payment_status IS NULL OR payment_status != 'portfolio')
     ORDER BY created_at DESC, id DESC`,
+    [userId]
+  );
+
+  const [portfolioRows] = await pool.query(
+    `SELECT
+        id,
+        user_id,
+        title,
+        genre,
+        synopsis,
+        media_links,
+        role_data,
+        work_type,
+        status,
+        created_at,
+        updated_at
+     FROM portfolio_work
+     WHERE user_id = ?
+     ORDER BY created_at DESC, id DESC`,
     [userId]
   );
 
@@ -193,7 +210,8 @@ async function getProfileData(userId) {
     ...userRows[0],
     name: formatDisplayName(userRows[0].name),
     email_verified: userRows[0].email_verified === 1 || userRows[0].email_verified === true,
-    scripts: scriptRows
+    scripts: scriptRows,
+    portfolioWorks: portfolioRows
   };
 }
 
@@ -207,7 +225,7 @@ const registerValidation = [
   validateRequest
 ];
 
-router.post('/register', registerLimiter, registerValidation, async (req, res) => {
+router.post('/register', authLimiter, registerLimiter, registerValidation, async (req, res) => {
   const isProd = process.env.NODE_ENV === 'production';
   try {
     const { name, email: normalizedEmail, password, role, college, city, gender, screen_name, display_preference } = req.body;
@@ -239,10 +257,11 @@ router.post('/register', registerLimiter, registerValidation, async (req, res) =
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
+    const emailVerifiedVal = isProd ? 0 : 1;
 
     const [result] = await pool.query(
-      `INSERT INTO users (name, email, password, role, college, city, gender, screen_name, display_preference)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (name, email, password, role, college, city, gender, screen_name, display_preference, email_verified)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name.trim(),
         normalizedEmail,
@@ -252,7 +271,8 @@ router.post('/register', registerLimiter, registerValidation, async (req, res) =
         city || null,
         gender || 'Prefer not to say',
         screen_name || null,
-        display_preference || 'Show Real Name Only'
+        display_preference || 'Show Real Name Only',
+        emailVerifiedVal
       ]
     );
 
@@ -263,7 +283,8 @@ router.post('/register', registerLimiter, registerValidation, async (req, res) =
       role: role || '',
       college: college || '',
       city: city || '',
-      gender: gender || 'Prefer not to say'
+      gender: gender || 'Prefer not to say',
+      email_verified: emailVerifiedVal === 1
     };
 
     const token = createToken(user);
@@ -385,7 +406,7 @@ const loginValidation = [
   validateRequest
 ];
 
-router.post('/login', loginLimiter, loginValidation, async (req, res) => {
+router.post('/login', authLimiter, loginLimiter, loginValidation, async (req, res) => {
   const { email: normalizedEmail, password } = req.body;
   const isProd = process.env.NODE_ENV === 'production';
   
@@ -497,13 +518,10 @@ router.post('/logout', (req, res) => {
     console.log(`[AUTH_DEBUG] Logout request received. Clearing auth token cookie.`);
   }
 
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? 'None' : 'Lax',
-    path: '/',
-    domain: isProd && !Boolean(process.env.VERCEL_URL?.includes('vercel.app')) ? '.takeone-nexus.net.in' : undefined
-  });
+  const cookieOpts = getCookieOptions();
+  delete cookieOpts.maxAge;
+  res.clearCookie('token', cookieOpts);
+  
   res.json({
     success: true,
     message: 'Logged out successfully'
@@ -576,8 +594,37 @@ router.get('/me', authenticateUser, async (req, res) => {
 });
 
 
-router.get('/search', authenticateUser, async (req, res) => {
+router.get('/search', async (req, res) => {
   try {
+    let loggedInUserId = null;
+    let token = null;
+
+    // 1. Check Authorization Header
+    const authHeader = req.headers.authorization || '';
+    if (authHeader.startsWith('Bearer ')) {
+      token = authHeader.slice(7);
+    }
+
+    // 2. Check Cookie
+    if (!token && req.cookies) {
+      token = req.cookies.token;
+    }
+
+    if (token) {
+      try {
+        const secret = process.env.JWT_SECRET;
+        if (secret) {
+          const decoded = jwt.verify(token, secret);
+          if (decoded && (!decoded.exp || Date.now() < decoded.exp * 1000)) {
+            req.user = decoded;
+            loggedInUserId = decoded.id;
+          }
+        }
+      } catch (error) {
+        // Ignore token verification errors for the public search endpoint
+      }
+    }
+
     const role = String(req.query.role || '').trim();
     const city = String(req.query.city || '').trim();
     const availability = String(req.query.availability || '').trim();
@@ -589,16 +636,23 @@ router.get('/search', authenticateUser, async (req, res) => {
     let countSql = `
       SELECT COUNT(*) as total
       FROM users
-      WHERE id != ?
+      WHERE 1=1
     `;
-    const countParams = [req.user.id];
+    const countParams = [];
 
     let sql = `
       SELECT id, name, email, role, college, city, bio, skills, avatar_url, gender, credits, screen_name, display_preference, social_links, created_at, email_verified, availability
       FROM users
-      WHERE id != ?
+      WHERE 1=1
     `;
-    const params = [req.user.id];
+    const params = [];
+
+    if (loggedInUserId) {
+      sql += ` AND id != ?`;
+      params.push(loggedInUserId);
+      countSql += ` AND id != ?`;
+      countParams.push(loggedInUserId);
+    }
 
     if (role) {
       sql += ` AND role LIKE ?`;
@@ -637,7 +691,23 @@ router.get('/search', authenticateUser, async (req, res) => {
     params.push(limit, offset);
 
     const rows = await safeQuery(sql, params);
-    const mappedRows = rows.map(r => ({ ...r, name: formatDisplayName(r.name) }));
+    const mappedRows = rows.map(r => {
+      const formatted = {
+        ...r,
+        name: formatDisplayName(r.name),
+        email_verified: r.email_verified === 1 || r.email_verified === true
+      };
+
+      if (!loggedInUserId) {
+        // Strip sensitive fields for guests (logged-out users)
+        delete formatted.email;
+        delete formatted.phone;
+        delete formatted.phone_number;
+        delete formatted.password;
+        delete formatted.salt;
+      }
+      return formatted;
+    });
 
     res.json({
       success: true,
@@ -663,10 +733,8 @@ router.get('/admin/list', authenticateUser, authenticatedApiLimiter, async (req,
     const role = String(req.user.role || '').toLowerCase();
     const secondaryRole = String(req.user.secondary_role || '').toLowerCase();
     const isAuthorized =
-      role === 'developer' ||
-      role === 'admin' ||
-      role === 'moderator' ||
-      secondaryRole === 'admin';
+      secondaryRole === 'admin' ||
+      secondaryRole === 'founder';
 
     if (!isAuthorized) {
       return res.status(403).json({
@@ -686,7 +754,8 @@ router.get('/admin/list', authenticateUser, authenticatedApiLimiter, async (req,
       `SELECT id, name, email, role, college, city, created_at
        FROM users
        ORDER BY created_at DESC, id DESC
-       LIMIT ${limit} OFFSET ${offset}`
+       LIMIT ? OFFSET ?`,
+      [limit, offset]
     );
 
     return res.json({
@@ -829,7 +898,7 @@ router.get('/:id', authenticateUser, requireSameUser, async (req, res) => {
  * POST /api/users/upload-avatar
  * File-handling route for profile pictures
  */
-router.post('/upload-avatar', authenticateUser, avatarUploadLimiter, upload.single('avatar'), async (req, res) => {
+router.post('/upload-avatar', authenticateUser, uploadLimiter, avatarUploadLimiter, upload.single('avatar'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
@@ -872,7 +941,7 @@ router.get('/public/:id', async (req, res) => {
     }
 
     const [userRows] = await pool.query(
-      `SELECT id, name, role, college, city, bio, skills, portfolio, avatar_url, gender, credits, screen_name, display_preference, social_links, created_at, availability
+      `SELECT id, name, role, college, city, bio, skills, portfolio, avatar_url, gender, credits, screen_name, display_preference, social_links, created_at, availability, email_verified
        FROM users
        WHERE id = ?
        LIMIT 1`,
@@ -915,6 +984,7 @@ router.get('/public/:id', async (req, res) => {
       data: {
         ...userRows[0],
         name: getCanonicalDisplayName(userRows[0]),
+        email_verified: userRows[0].email_verified === 1 || userRows[0].email_verified === true,
         scripts: scriptRows
       }
     });
@@ -946,7 +1016,8 @@ router.get('/leaderboard', async (req, res) => {
       success: true,
       data: rows.map(r => ({
         ...r,
-        displayName: getCanonicalDisplayName(r)
+        displayName: getCanonicalDisplayName(r),
+        email_verified: r.email_verified === 1 || r.email_verified === true
       }))
     });
   } catch (error) {
@@ -979,7 +1050,7 @@ router.get('/transactions', authenticateUser, async (req, res) => {
 });
 
 // Allowed event types — reject anything outside this set to prevent abuse
-const ALLOWED_EVENT_TYPES = new Set(['profile_view', 'portfolio_view', 'project_engagement']);
+const ALLOWED_EVENT_TYPES = new Set(['profile_view', 'portfolio_view', 'project_engagement', 'profile_rated', 'rating_removed']);
 
 /**
  * POST /api/users/analytics/track

@@ -27,8 +27,13 @@ body {
     background: var(--void);
     color: var(--cream);
     font-family: 'Space Mono', monospace;
-    cursor: none;
     min-height: 100vh;
+}
+
+@media (pointer: fine) {
+    body {
+        cursor: none;
+    }
 }
 
 /* ── SCAN LINES OVERLAY ── */
@@ -123,6 +128,13 @@ header:hover {
     animation: pulse 2s ease-in-out infinite;
 }
 
+nav {
+    display: flex;
+    align-items: center;
+    gap: clamp(12px, 1.8vw, 24px);
+    flex-wrap: nowrap;
+}
+
 nav a {
     font-size: 9px;
     letter-spacing: 0.3em;
@@ -130,6 +142,7 @@ nav a {
     color: var(--silver);
     text-decoration: none;
     transition: color 0.3s;
+    white-space: nowrap;
 }
 
 nav a:hover {
@@ -147,6 +160,7 @@ nav a:hover {
     text-transform: uppercase;
     cursor: none;
     transition: all 0.25s;
+    white-space: nowrap;
 }
 
 .profile-logout:hover {
@@ -1303,3 +1317,39 @@ nav a:hover {
     50% { opacity: 1; }
     100% { opacity: 0.4; }
 }
+
+:root.role-theme-photographer,
+.role-theme-photographer {
+  --neon: #8B5CF6;
+  --neon2: #A78BFA;
+  --border: rgba(139, 92, 246, 0.18);
+  --glow: rgba(139, 92, 246, 0.25);
+  
+  --theme-primary: #8B5CF6;
+  --theme-primary-rgb: 139, 92, 246;
+  --theme-secondary: #7C3AED;
+  --theme-secondary-rgb: 124, 58, 237;
+  --theme-glow: rgba(139, 92, 246, 0.15);
+}
+
+@media (max-width: 1024px) {
+    header {
+        height: auto;
+        min-height: 60px;
+        flex-wrap: wrap;
+        padding: 12px 5%;
+        gap: 12px;
+    }
+
+    nav {
+        width: 100%;
+        gap: 14px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    nav a {
+        font-size: 8px;
+        letter-spacing: 0.15em;
+    }
+}
+

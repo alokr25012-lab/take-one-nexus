@@ -35,12 +35,13 @@ header.global-header:hover {
   animation: pulse 2s ease-in-out infinite;
 }
 
-nav { display: flex; align-items: center; gap: 32px; }
+nav { display: flex; align-items: center; gap: clamp(12px, 1.8vw, 24px); }
 nav a {
   font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase;
   color: var(--silver); text-decoration: none;
   transition: color 0.3s;
   position: relative;
+  white-space: nowrap;
 }
 nav a:hover { color: var(--cream); }
 nav a::after {
@@ -838,6 +839,10 @@ nav a:hover::after { width: 100%; }
   .chat-header {
     padding: 10px 15px;
   }
+  .date-separator-wrap {
+    top: 64px;
+    z-index: 10;
+  }
 
   .header-avatar {
     width: 36px;
@@ -867,6 +872,10 @@ nav a:hover::after { width: 100%; }
   
   .message-bubble {
     max-width: 85%;
+  }
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
 }
 .mobile-back-btn {
@@ -2161,7 +2170,7 @@ nav a:hover::after { width: 100%; }
   50% { opacity: 1; }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .chat-page {
     display: flex;
     flex-direction: column;
@@ -2225,4 +2234,19 @@ nav a:hover::after { width: 100%; }
     gap: 10px 14px;
   }
 }
+
+:root.role-theme-photographer,
+.role-theme-photographer {
+  --neon: #8B5CF6;
+  --neon2: #A78BFA;
+  --border: rgba(139, 92, 246, 0.18);
+  --glow: rgba(139, 92, 246, 0.25);
+  
+  --theme-primary: #8B5CF6;
+  --theme-primary-rgb: 139, 92, 246;
+  --theme-secondary: #7C3AED;
+  --theme-secondary-rgb: 124, 58, 237;
+  --theme-glow: rgba(139, 92, 246, 0.15);
+}
+
 

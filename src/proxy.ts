@@ -20,7 +20,7 @@ export async function proxy(request: NextRequest) {
   // Protected routes for all authenticated users
   const isProtectedRoute =
     pathname.startsWith('/chat') ||
-    pathname.startsWith('/profile') ||
+    (pathname.startsWith('/profile') && !request.nextUrl.searchParams.has('id')) ||
     pathname.startsWith('/developer');
 
   const isAdminRoute = pathname.startsWith('/admin');
@@ -45,8 +45,7 @@ export async function proxy(request: NextRequest) {
 
       const userRole = (payload.role as string || '').toLowerCase();
       const userSecondaryRole = (payload.secondary_role as string || '').toLowerCase();
-      const isAdminRole = userRole === 'admin' || userSecondaryRole === 'admin';
-      const isDeveloperRole = userRole === 'developer' || userSecondaryRole === 'developer';
+      const isAdminRole = userRole === 'admin' || userSecondaryRole === 'admin' || userSecondaryRole === 'founder';
 
       if (isAdminRoute) {
         if (!isAdminRole) {
@@ -55,13 +54,13 @@ export async function proxy(request: NextRequest) {
       }
 
       if (pathname.startsWith('/developer')) {
-        if (!isDeveloperRole && !isAdminRole) {
+        if (!isAdminRole) {
           return NextResponse.redirect(new URL('/?error=unauthorized', request.url));
         }
       }
 
       const isVerifiedRoute = VERIFIED_ONLY_ROUTES.some(r => pathname.startsWith(r));
-      if (isVerifiedRoute && !isAdminRole && !isDeveloperRole) {
+      if (isVerifiedRoute && !isAdminRole) {
         const emailVerified = payload.email_verified;
         // Grant access when email_verified is explicitly true or 1 (from legacy database integer formats).
         // Legacy tokens lacking the field (undefined/null) are also blocked.

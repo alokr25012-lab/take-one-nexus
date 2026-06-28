@@ -1,121 +1,221 @@
 /**
  * middleware/rateLimiter.js
  *
- * Enhanced Sliding-Window Counter Rate Limiter.
- * Retains 100% exact API backward compatibility with legacy call sites.
+ * Distributed Rate Limiting Middleware using express-rate-limit.
+ * Custom store connects to Upstash Redis REST API, with fallback to local memory.
+ * Maintains full backward compatibility with legacy custom rate limit calls.
  */
 
 'use strict';
 
-// Global memory tracker for sliding timestamps
-const ipStore = new Map(); // Key: fully-qualified tracking key, Value: Array of timestamps (ms)
+const rateLimit = require('express-rate-limit');
 
 /**
- * Create an Express sliding-window rate limit middleware.
- *
+ * Custom Upstash Redis rate limit store with resilient in-memory fallback.
+ */
+class UpstashRedisStore {
+  /**
+   * @param {string} url - Upstash Redis REST API URL
+   * @param {string} token - Upstash Redis REST API Token
+   * @param {string} prefix - Key prefix for Redis store
+   * @param {number} windowMs - Rate limiting window size in milliseconds
+   */
+  constructor(url, token, prefix, windowMs) {
+    this.url = url;
+    this.token = token;
+    this.prefix = prefix;
+    this.windowMs = windowMs;
+    this.memoryFallback = new Map();
+  }
+
+  /**
+   * Increments hit count for key.
+   * 
+   * @param {string} key - Tracking key (e.g. IP address)
+   * @returns {Promise<{totalHits: number, resetTime: Date}>}
+   */
+  async increment(key) {
+    const redisKey = `rl:${this.prefix}:${key}`;
+    
+    if (this.url && this.token) {
+      try {
+        const res = await fetch(`${this.url}/pipeline`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify([
+            ["INCR", redisKey],
+            ["TTL", redisKey]
+          ]),
+          signal: AbortSignal.timeout(3000) // 3 seconds timeout
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data) && !data[0].error && !data[1].error) {
+            const totalHits = Number(data[0].result);
+            let ttl = Number(data[1].result);
+            
+            // Set expiration if not already set (e.g. key was just created)
+            if (ttl === -1) {
+              const expireSec = Math.ceil(this.windowMs / 1000);
+              await fetch(`${this.url}/expire/${redisKey}/${expireSec}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${this.token}` },
+                signal: AbortSignal.timeout(2000)
+              });
+              ttl = expireSec;
+            }
+            
+            const resetTime = new Date(Date.now() + (ttl * 1000));
+            return { totalHits, resetTime };
+          }
+        }
+      } catch (err) {
+        console.warn(`[RateLimiter] Upstash Redis call failed for ${redisKey}. Falling back to memory:`, err.message);
+      }
+    }
+    
+    // In-memory fallback
+    const now = Date.now();
+    let hits = this.memoryFallback.get(key) || [];
+    
+    // Evict timestamps outside the window range
+    hits = hits.filter(t => now - t < this.windowMs);
+    hits.push(now);
+    
+    this.memoryFallback.set(key, hits);
+    
+    const oldest = hits[0];
+    const resetTime = new Date(oldest + this.windowMs);
+    
+    return {
+      totalHits: hits.length,
+      resetTime
+    };
+  }
+
+  /**
+   * Decrements hit count for key (optional interface requirement).
+   * 
+   * @param {string} key
+   */
+  async decrement(key) {
+    const redisKey = `rl:${this.prefix}:${key}`;
+    if (this.url && this.token) {
+      try {
+        await fetch(`${this.url}/decr/${redisKey}`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${this.token}` },
+          signal: AbortSignal.timeout(1000)
+        });
+      } catch (e) {}
+    }
+    
+    const hits = this.memoryFallback.get(key);
+    if (hits && hits.length > 0) {
+      hits.pop();
+      this.memoryFallback.set(key, hits);
+    }
+  }
+
+  /**
+   * Resets hit count for key (optional interface requirement).
+   * 
+   * @param {string} key
+   */
+  async resetKey(key) {
+    const redisKey = `rl:${this.prefix}:${key}`;
+    if (this.url && this.token) {
+      try {
+        await fetch(`${this.url}/del/${redisKey}`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${this.token}` },
+          signal: AbortSignal.timeout(1000)
+        });
+      } catch (e) {}
+    }
+    
+    this.memoryFallback.delete(key);
+  }
+}
+
+/**
+ * Express sliding-window rate limit creator function.
+ * Keep 100% exact API backward compatibility with legacy custom rate limit calls.
+ * 
  * @param {object}   options
  * @param {number}   options.limit       - Max requests per window
  * @param {number}   options.windowMs    - Window duration in milliseconds
  * @param {string}   [options.keyPrefix] - Store key prefix (default: 'rl')
- * @param {function} [options.keyFn]     - Custom key function: (req) => string
+ * @param {function} [options.keyFn]     - Custom key generator function: (req) => string
  */
 function createRateLimiter({ limit, windowMs, keyPrefix = 'rl', keyFn }) {
   const finalLimit = limit || 60;
   const finalWindowMs = windowMs || 60 * 1000;
 
-  return (req, res, next) => {
-    const startTime = performance.now();
-    const now = Date.now();
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-    // 1. Exact replica of legacy key generation to maintain consistency across proxies
-    let key;
-    if (keyFn) {
-      key = keyFn(req);
-    } else {
-      const ip =
-        (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
-        req.ip ||
-        'unknown';
-      key = `${keyPrefix}:${ip}`;
-    }
-
-    // Initialize map track if first hit
-    if (!ipStore.has(key)) {
-      ipStore.set(key, []);
-    }
-    const timestamps = ipStore.get(key);
-
-    // 2. OPTIMIZED INLINE PRUNING: Evict ticks outside the active sliding timeline
-    // Chronological order guarantees old entries sit exclusively at index 0.
-    const windowStart = now - finalWindowMs;
-    while (timestamps.length > 0 && timestamps[0] <= windowStart) {
-      timestamps.shift(); // Amortized O(1) removal, dramatically faster than .filter()
-    }
-
-    const currentRequestCount = timestamps.length;
-
-    // 3. Acceptance/Throttling Guard Check
-    if (currentRequestCount >= finalLimit) {
-      const oldestActiveTimestamp = timestamps[0];
-      // Dynamic mathematical backup calculation for Retry-After (seconds)
-      const retryAfterSeconds = Math.ceil((finalWindowMs - (now - oldestActiveTimestamp)) / 1000);
-
-      // Return both legacy and modern metadata compliance headers
-      res.set({
-        'X-RateLimit-Limit': finalLimit,
-        'X-RateLimit-Remaining': 0,
-        'Retry-After': retryAfterSeconds,
-        'RateLimit-Limit': finalLimit,
-        'RateLimit-Remaining': 0,
-        'RateLimit-Reset': retryAfterSeconds
-      });
-
-      const endTime = performance.now();
-      console.log(`[SLIDING-LIMITER] Blocked Key: ${key} | Latency Overhead: ${(endTime - startTime).toFixed(4)}ms`);
-
-      return res.status(429).json({
+  return rateLimit.rateLimit({
+    windowMs: finalWindowMs,
+    limit: finalLimit,
+    standardHeaders: 'draft-7', // Send RateLimit-* headers
+    legacyHeaders: true, // Send X-RateLimit-* headers
+    validate: false,
+    keyGenerator: (req) => {
+      if (keyFn) return keyFn(req);
+      const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || 'unknown';
+      return ip;
+    },
+    store: new UpstashRedisStore(url, token, keyPrefix, finalWindowMs),
+    handler: (req, res, next, options) => {
+      res.status(429).json({
         success: false,
         message: 'Too many requests. Please wait before trying again.'
       });
     }
-
-    // 4. Track current loop execution tick
-    timestamps.push(now);
-    ipStore.set(key, timestamps);
-
-    // 5. Standard and Backward-Compatible Compliance Response Headers
-    res.set({
-      'X-RateLimit-Limit': finalLimit,
-      'X-RateLimit-Remaining': finalLimit - timestamps.length,
-      'RateLimit-Limit': finalLimit,
-      'RateLimit-Remaining': finalLimit - timestamps.length
-    });
-
-    const endTime = performance.now();
-    // Verification logging check (<1ms threshold requirement verification)
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`[SLIDING-LIMITER] Allowed Key: ${key} | Overhead: ${(endTime - startTime).toFixed(4)}ms | Remaining: ${finalLimit - timestamps.length}`);
-    }
-
-    next();
-  };
+  });
 }
 
-// 6. Non-Blocking Memory Eviction Daemon
-// Periodically eliminates dead client keys whose request history has decayed down to zero.
-const intervalId = setInterval(() => {
-  const now = Date.now();
-  for (const [key, timestamps] of ipStore.entries()) {
-    // Check if the latest registered hit for the tracking context falls out of scope
-    if (timestamps.length === 0 || now - timestamps[timestamps.length - 1] > 15 * 60 * 1000) {
-      ipStore.delete(key);
-    }
-  }
-}, 5 * 60 * 1000); // Runs every 5 minutes
+// Specialized Rate Limiters
+const authLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 20, // Max 20 auth attempts per 15 minutes
+  keyPrefix: 'auth-limit'
+});
 
-// Prevent the daemon timer from keeping the primary Node event loop open during test suites
-if (typeof intervalId.unref === 'function') {
-  intervalId.unref();
-}
+const ratingLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 30, // Max 30 ratings per 15 minutes
+  keyPrefix: 'rating-limit'
+});
 
-module.exports = { createRateLimiter };
+const portfolioLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 50, // Max 50 portfolio operations per 15 minutes
+  keyPrefix: 'portfolio-limit'
+});
+
+const uploadLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 10, // Max 10 file uploads per 15 minutes
+  keyPrefix: 'upload-limit'
+});
+
+const communityLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 30, // Max 30 community modifications per 15 minutes
+  keyPrefix: 'community-limit'
+});
+
+module.exports = {
+  createRateLimiter,
+  authLimiter,
+  ratingLimiter,
+  portfolioLimiter,
+  uploadLimiter,
+  communityLimiter
+};

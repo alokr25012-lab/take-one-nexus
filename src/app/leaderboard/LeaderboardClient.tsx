@@ -17,6 +17,8 @@ interface User {
   college?: string;
   credits: number;
   email_verified?: boolean;
+  averageRating?: number;
+  ratingCount?: number;
 }
 
 interface CreditTask {
@@ -45,7 +47,7 @@ export default function LeaderboardClient({ initialUsers, pusherConfig }: Leader
 
   const fetchLeaderboard = useCallback(async () => {
     try {
-      const res = await fetch('/api/users/leaderboard');
+      const res = await fetch('/api/ratings/leaderboard');
       const json = await res.json();
       if (json.success) {
         setUsers(json.data);
@@ -129,13 +131,14 @@ export default function LeaderboardClient({ initialUsers, pusherConfig }: Leader
                 <th>Rank</th>
                 <th>Creator</th>
                 <th>Role</th>
+                <th>Rating</th>
                 <th style={{ textAlign: 'right' }}>Credits</th>
               </tr>
             </thead>
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', padding: '100px 0', color: 'rgba(255,255,255,0.2)' }}>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '100px 0', color: 'rgba(255,255,255,0.2)' }}>
                     No creators have earned credits yet.
                   </td>
                 </tr>
@@ -159,7 +162,7 @@ export default function LeaderboardClient({ initialUsers, pusherConfig }: Leader
                           <div className="user-info">
                             <span className="user-name" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               {displayName}
-                              {user.email_verified && (
+                              {user.email_verified === true && (
                                 <span className="verified-badge-inline" title="Verified Creator" style={{ display: 'inline-flex', alignItems: 'center' }}>
                                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--neon)', filter: 'drop-shadow(0 0 3px var(--neon))' }}>
                                     <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="var(--neon)" />
@@ -172,6 +175,17 @@ export default function LeaderboardClient({ initialUsers, pusherConfig }: Leader
                         </div>
                       </td>
                       <td>{user.role || 'Crew'}</td>
+                      <td>
+                        {user.averageRating && user.averageRating > 0 ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ color: 'var(--amber)', textShadow: '0 0 6px rgba(255, 166, 32, 0.4)' }}>★</span>
+                            <span>{user.averageRating.toFixed(1)}</span>
+                            <span style={{ fontSize: '0.8em', color: 'var(--silver)' }}>({user.ratingCount})</span>
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--silver)', fontSize: '0.9em' }}>—</span>
+                        )}
+                      </td>
                       <td className="credits-cell">
                         {user.credits.toLocaleString()} <span style={{ fontSize: '0.7em', opacity: 0.5 }}>PTS</span>
                       </td>

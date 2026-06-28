@@ -1,16 +1,17 @@
 # PROJECT CONTEXT — TAKE ONE Nexus
 
-> A cinematic film crew collaboration platform. Connects student filmmakers across campuses to share scripts, find crew, and build productions.
+> A cinematic film crew collaboration platform. Connects filmmakers, creators, photographers, editors, writers, and production teams across campuses to share scripts, find crew, form communities, and build productions together.
 
 ---
 
 ## 🎯 Product Vision
 
-**TAKE ONE Nexus** is a source-available, role-based creative ecosystem designed specifically for the next generation of filmmakers, screenwriters, and creative technocrats.
+**TAKE ONE Nexus** is an open-source, role-based creative ecosystem designed specifically for filmmakers and independent creators.
 
-Our goal is to solve a fundamental problem in independent and student filmmaking: **Crew Discovery**. By building a highly stylized, cinematic digital platform, we provide a unified space where creatives can:
+Our goal is to solve a fundamental problem in creative industries: **Crew Discovery and Management**. By building a highly stylized, cinematic digital platform, we provide a unified space where creatives can:
 - Showcase their work in a professional **Portfolio**.
-- Find collaborators based on precise **Creative Roles** (Director, DP, Editor, Sound Designer, etc.).
+- Find collaborators based on precise **Creative Roles** (Director, DP, Editor, Photographer, Writer, etc.).
+- Form and discover specialized **Communities** and manage their teams.
 - Communicate securely via **Real-Time Chat** (requires verified email).
 - Earn **Creator Credits** as reputation points for participating in the ecosystem.
 
@@ -21,7 +22,7 @@ Our goal is to solve a fundamental problem in independent and student filmmaking
 ## 🏗️ Architecture Summary
 
 TAKE ONE Nexus uses a robust **dual-server architecture**:
-- **Next.js App Router (`src/app/`)**: Handles dynamic, authenticated pages (Profile, Chat, Admin, Auth flows).
+- **Next.js App Router (`src/app/`)**: Handles dynamic, authenticated pages (Profile, Chat, Admin, Communities, Auth flows).
 - **Express.js API (`server.js`)**: Serves as a standalone backend API and hosts static, vanilla HTML/JS/CSS pages (`public/*.htm`).
 
 Both services are deployed simultaneously on **Vercel** using `@vercel/node` for the Express backend and the standard Next.js builder.
@@ -33,7 +34,7 @@ Both services are deployed simultaneously on **Vercel** using `@vercel/node` for
 ### 1. The Role System
 Roles are the central identifier for users and projects.
 - **Source of Truth**: `public/scripts/constants/roles.js`
-- **Supported Roles**: Director, Cinematographer / DP, Writer, Editor, Sound Designer, Designer, Developer, Actor, Producer, Lighting Crew, Set Support, Other.
+- **Supported Roles**: Director, Cinematographer / DP, Writer, Editor, Sound Designer, Designer, Developer, Actor, Producer, Lighting Crew, Set Support, Photographer, Other.
 - This taxonomy drives user registration, crew directory filtering, and dynamic portfolio generation.
 
 ### 2. Portfolio & Work Showcase
@@ -48,43 +49,49 @@ Secure transmission for project collaboration — **requires verified email**.
 - **Mission Assignment & RBAC**: Integrated Task Management allows `creator` or `admin` roles to assign "missions" to crew members. Only authorized users can create/edit tasks, while crew can only mark their assigned tasks as complete.
 - **Cinematic UI**: Cursor-based pagination, intelligent date-grouping, and tabbed interface for Transmissions vs. Missions.
 
-### 4. Creator Credits & Leaderboard
+### 4. Communities & Member Management
+Comprehensive collaboration hubs for creative teams.
+- **Join Requests & Invitations**: Users can apply to join groups, or administrators can send direct invitations. Contains dedicated dashboards to approve/reject requests or cancel/resend invitations.
+- **Role Elevation**: Elevate members to Group Admins or demote them back to standard members.
+- **Logo Customization**: Supports custom group logos with query-based cache-busting to guarantee instant visual updates.
+
+### 5. Creator Credits & Leaderboard
 The heartbeat of the Nexus economy.
 - **Earning**: Users earn credits for completing missions. Missions are assigned in chat, completed by the operative, and approved by a Director/Admin.
 - **Credit Transaction Engine**: Every credit earned is recorded in an immutable `CreditTransaction` audit log, ensuring transparency and security.
-- **Real-Time Leaderboard**: A dynamic Next.js page (`/leaderboard`) ranks the top 50 creators globally, updating instantly via Pusher events (`leaderboard-update`) whenever credits are granted.
+- **Real-Time Leaderboard**: A dynamic Next.js page (`/leaderboard`) ranks the top 100 creators globally, updating instantly via Pusher events (`leaderboard-update`) whenever credits are granted.
 
-### 5. Email Verification System *(v1.1)*
+### 6. Email Verification System
 Full lifecycle email verification to secure platform access.
 - **On Registration**: A verification email is sent automatically via Resend with a 24-hour expiry token.
 - **Access Gate**: Unverified users cannot access `/chat`. A sticky `EmailVerificationBanner` prompts resend with a 60-second cooldown.
 - **Token Security**: Tokens are 32-byte cryptographically random values stored as SHA-256 hashes. The raw token only travels in the email link — never in the database.
 - **Pages**: `/verify-email` (handles all verification states), `/forgot-password`, `/reset-password` (with password strength meter).
 
-### 6. IP-Based Rate Limiting & Security Headers *(v1.1)*
+### 7. IP-Based Rate Limiting & Security Headers
 Comprehensive network and browser-level security defenses.
 - **Next.js API routes**: Sliding-window rate limiters via `src/lib/rate-limiter.ts`.
 - **Express routes**: Helmet middleware for security headers, and `middleware/rateLimiter.js` for IP-based limits (Login: 5/15min, Register: 3/hour).
 - **Security Headers**: Strict Content Security Policy (CSP), X-Frame-Options (DENY), and nosniff enabled globally to prevent XSS, clickjacking, and MIME-sniffing.
 - **Fail-open design**: Limiter errors never block legitimate users.
 
-### 7. GDPR Cookie Consent *(v1.1)*
+### 8. GDPR Cookie Consent
 Production-grade consent management with granular controls.
 - **Banner**: Slide-up animated `CookieConsentBanner` with Accept All / Reject / Customize options.
 - **Categories**: Essential (always on), Analytics, Session Replay, Feature Flags.
 - **Persistence**: Consent stored in `localStorage` under `ton_cookie_consent`. Custom `consentUpdated` DOM event triggers PostHog re-initialization without page reload.
 
-### 8. Observability *(v1.1)*
-Separated concerns between analytics and error monitoring.
-- **PostHog** (`src/lib/posthog.ts`): Frontend analytics, session replay (with full input masking), and feature flags. Only activates after explicit cookie consent.
-- **Sentry** (`src/lib/sentry.ts`): Backend API and server error capture only. Never used for analytics. Scrubs `password`, `token`, `secret`, `key` from all events before sending.
+### 9. Observability & Telemetry
+Separated concerns between analytics, behavior tracking, and error monitoring.
+- **Graphifyy Analytics**: Privacy-friendly, cookies-free analytics tracking user visits, sources, and page loading speed.
+- **PostHog** (`src/lib/posthog.ts`): Frontend behavioral tracking, session replay (with input masking), and feature flags. Requires cookie consent.
+- **Sentry** (`src/lib/sentry.ts`): Backend API and server exception tracking. Automatically scrubs `password`, `token`, `secret`, and `key` from logs before sending.
 
-### 9. Futuristic Payment Engine *(v1.2 Proposed)*
-A premium financial layer to power the independent film economy, integrating monetization seamlessly into our role-based mission architecture.
-- **Creator Monetization**: Standardizes script pricing, option agreements, and digital custom writing packages directly from the portfolio showcase.
-- **Premium Memberships & Tiers**: Handles recurring subscription packages to grant advanced filters, prominent badge layouts, and prioritized crew listings.
-- **Production Escrows & Milestones**: Directors can fund a project budget securely. Payments are held in a secure escrow engine and programmatically released as crew members successfully complete their assigned tasks/missions.
-- **Revenue Splitting**: Seamless split-payouts for script co-writers and multi-partner packages.
+### 10. Razorpay Payment Gateway
+Ensures financial audit integrity.
+- **Draft to Public**: Script submissions remain temporary drafts until payment is verified.
+- **Signature verification**: Performed server-side on raw body buffers to prevent webhook spoofing.
+- **Cleanup job**: Automatically clears expired or failed payment drafts.
 
 ---
 
@@ -93,7 +100,7 @@ A premium financial layer to power the independent film economy, integrating mon
 - **Authentication**: JWT-based auth. Tokens are stored in secure, `HttpOnly` cookies to prevent XSS attacks.
 - **Email Verification**: Required to access messaging features. Token hashing prevents token enumeration attacks. All auth endpoints return generic success messages to prevent email enumeration.
 - **Authorization**: Role-based access control (RBAC). Admin, Developer, and Moderator roles have access to the Next.js `/admin` dashboard.
-- **Rate Limiting**: All auth endpoints are rate-limited by IP using sliding-window counters. See § 6 above.
+- **Rate Limiting**: All auth and payment endpoints are rate-limited by IP using sliding-window counters.
 - **Issue Tracking**: A global `GlobalIssueReporter` allows any user to report bugs or malicious behavior securely to the admin panel.
 
 ---
@@ -109,23 +116,17 @@ A premium financial layer to power the independent film economy, integrating mon
 ### Scaling Roadmap
 As the platform grows, we plan to decouple the monolithic architecture:
 1. **Persistent Collaboration**: Transitioning from ephemeral chat to persistent project hubs with centralized asset management.
-2. **CDN Optimization**: User uploaded media (avatars, posters) will be migrated to dedicated object storage (AWS S3/CloudFront).
+2. **CDN Optimization**: User uploaded media (avatars, posters, community logos) will be migrated to dedicated object storage (AWS S3/CloudFront).
 3. **Public API**: Implementing `/api/v1/` for external integrations and the upcoming mobile app.
-4. **Rate Limiting at Scale**: Both Express and Next.js limiters employ highly optimized sliding-window in-memory stores, eliminating backing database latency and infrastructure requirements.
-5. **Secure Payment Gateway Infrastructure**: Deploying PCI-compliant gateway endpoints utilizing Stripe and Razorpay. This system will introduce idempotent transaction processing to avoid double charges, custom ledger audit trails in MySQL, and highly secure, signature-validated webhook controllers.
-
-## Critical Fixes: Current Enforcement
-
-- Script uploads are temporary drafts until Razorpay payment is verified server-side.
-- No script enters public pages, `scripts`, moderation, or leaderboard counts unless `payment_verified = TRUE`.
-- Admins and moderators can delete scripts through an audited backend flow.
-- The admin task system supports creation, approval, rejection, manual Nexus Credits, activity logs, and leaderboard updates.
+4. **Rate Limiting at Scale**: Transitioning in-memory limiters to a distributed sliding-window mechanism (e.g. Upstash Redis) when horizontal server scaling is introduced.
 
 ---
 
 ## 🌐 Community & Collaboration Programs
 
-TAKE ONE Nexus is developed as a source-available filmmaking collaboration platform and participates in community-driven development initiatives including NSoC'26 and GSSoC 2026.
+TAKE ONE – NEXUS is developed as an open-source collaboration platform and participates in community-driven development initiatives:
+* **NSoC'26 (Nexus Spring of Code 2026)**: Supported development of the core security architecture, double-submit CSRF, and JWT authorization rules.
+* **GSSoC'26 (GirlScript Summer of Code 2026)**: Focuses on communities, roles, invite/request boards, and responsive layouts.
 
 Contributors are encouraged to explore issues, submit pull requests, improve documentation, and help build tools for filmmakers and creative teams under the project's source-available license.
 
@@ -134,4 +135,3 @@ Contributors are encouraged to explore issues, submit pull requests, improve doc
 ## 🤝 Join the Production
 
 We are constantly improving. If you are participating in **NSoC'26** or **GSSoC 2026**, this document is your foundation. Check out [ARCHITECTURE.md](ARCHITECTURE.md) for deep technical details and [CONTRIBUTING.md](CONTRIBUTING.md) to start pushing code!
-

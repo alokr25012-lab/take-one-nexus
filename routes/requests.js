@@ -6,12 +6,12 @@ const { createNotification } = require('../utils/notifications');
 const { getCanonicalDisplayName } = require('../utils/formatting');
 const router = express.Router();
 
-let initialized = false;
+let initPromise = null;
 
 async function ensureRequestsTable() {
-  if (initialized) return;
+  if (initPromise) return initPromise;
   
-  await pool.query(`
+  initPromise = pool.query(`
     CREATE TABLE IF NOT EXISTS collaboration_requests (
       id INT UNSIGNED NOT NULL AUTO_INCREMENT,
       script_id INT UNSIGNED NOT NULL,
@@ -43,7 +43,7 @@ async function ensureRequestsTable() {
     )
   `);
   
-  initialized = true;
+  return initPromise;
 }
 
 router.post('/', authenticateUser, requireVerified, async (req, res) => {
@@ -85,7 +85,7 @@ router.post('/', authenticateUser, requireVerified, async (req, res) => {
     const script = scriptRows[0];
 
     const [requesterRows] = await pool.query(
-      `SELECT id, name, email, role, college, city
+      `SELECT id, name, email, role, college, city, screen_name, display_preference
        FROM users
        WHERE id = ?
        LIMIT 1`,
@@ -207,6 +207,8 @@ router.patch('/:id/status', authenticateUser, requireVerified, async (req, res) 
         collaboration_requests.requester_id,
         scripts.title AS script_title,
         owners.name AS owner_name,
+        owners.screen_name AS owner_screen_name,
+        owners.display_preference AS owner_display_preference,
         requesters.name AS requester_name
        FROM collaboration_requests
        JOIN scripts ON scripts.id = collaboration_requests.script_id
@@ -245,7 +247,11 @@ router.patch('/:id/status', authenticateUser, requireVerified, async (req, res) 
         userId: request.requester_id,
         type: `request_${status}`,
         title: `Request ${status}`,
-        body: `${getCanonicalDisplayName(request)} ${status} your request for "${request.script_title}".`,
+        body: `${getCanonicalDisplayName({
+          name: request.owner_name,
+          screen_name: request.owner_screen_name,
+          display_preference: request.owner_display_preference
+        })} ${status} your request for "${request.script_title}".`,
         linkUrl: '/profile#collab'
       });
     } catch (notificationError) {

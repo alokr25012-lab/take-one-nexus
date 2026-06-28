@@ -3,11 +3,6 @@
 Welcome to the TAKE ONE Nexus Roadmap! This document outlines our strategic vision for the future of the platform. We are building a cinematic ecosystem, and these features represent the next leap in connecting filmmakers, crew members, and screenwriters.
 
 ---
-# 🗺️ Feature Roadmap
-
-Welcome to the TAKE ONE Nexus Roadmap! This document outlines our strategic vision for the future of the platform. We are building a cinematic ecosystem, and these features represent the next leap in connecting filmmakers, crew members, and screenwriters.
-
----
 
 ## 📑 Table of Contents
 
@@ -56,7 +51,8 @@ Welcome to the TAKE ONE Nexus Roadmap! This document outlines our strategic visi
 
 ## 🌐 Community & Collaboration Programs
 
-TAKE ONE Nexus is developed as a source-available filmmaking collaboration platform and participates in community-driven development initiatives including NSoC'26.
+TAKE ONE – NEXUS is developed as an open-source collaboration platform and participates in community-driven development initiatives:
+* **NSoC'26 (Nexus Spring of Code 2026)**: Focuses on core modules, telemetry, and platform security.
+* **GSSoC'26 (GirlScript Summer of Code 2026)**: Focuses on communities, roles, invite/request boards, and responsive layouts.
 
 Contributors are encouraged to explore issues, submit pull requests, improve documentation, and help build tools for filmmakers and creative teams under the project's source-available license.
-

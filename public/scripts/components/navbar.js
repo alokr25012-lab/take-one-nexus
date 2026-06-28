@@ -7,6 +7,8 @@ const Navbar = {
     config: [
         { label: 'Discover Projects', href: '/#explore' },
         { label: 'Find Crew', href: '/crew', id: 'navCrewLink' },
+        { label: 'Leaderboard', href: '/leaderboard' },
+        { label: 'Community', href: '/chat' },
         { label: 'Share Your Script', href: '/#upload', id: 'navUploadLink' },
         { label: 'Profile', href: '/profile' }
     ],
@@ -31,10 +33,7 @@ const Navbar = {
                 const creatorRoles = ['director', 'writer', 'producer'];
                 
                 if (creatorRoles.includes(role)) {
-                    label = user.role; // Use specific role like 'Director'
-                } else if (role && role !== 'crew' && role !== 'admin') {
-                    label = user.role; // Use specific role like 'Cinematographer'
-                    href = '/#explore';
+                    label = 'Share Your Script';
                 } else {
                     label = 'Workspace';
                     href = '/#explore';
@@ -59,10 +58,10 @@ const Navbar = {
             html += `<a href="${href}" ${item.id ? `id="${item.id}"` : ''} ${additionalAttrs}>${label}</a>`;
         });
 
-        // Add Admin Panel for admins, developers, and moderators
-        if (user && user.role) {
-            const role = user.role.toLowerCase();
-            if (role === 'admin' || role === 'developer' || role === 'moderator') {
+        // Add Admin Panel for admins and founders in the secondary_role
+        if (user) {
+            const secondaryRole = String(user.secondary_role || '').toLowerCase();
+            if (secondaryRole === 'admin' || secondaryRole === 'founder') {
                 html += `<a href="https://admin.takeone-nexus.net.in" style="color: var(--neon); font-weight: bold;">Admin Panel</a>`;
             }
         }

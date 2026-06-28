@@ -234,3 +234,51 @@
     bottom: max(90px, calc(env(safe-area-inset-bottom) + 82px));
   }
 }
+
+/* Photographer theme overrides for Chat FAB */
+.role-theme-photographer .takeone-chat-fab,
+.role-theme-photographer.takeone-chat-fab {
+  border-color: rgba(139, 92, 246, 0.72);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.98), rgba(124, 58, 237, 0.92)), #8B5CF6;
+  box-shadow:
+    0 0 0 1px rgba(139, 92, 246, 0.16),
+    0 0 24px rgba(139, 92, 246, 0.42),
+    0 16px 42px rgba(0, 0, 0, 0.5);
+  animation: takeoneFabPulsePhotographer 3.2s ease-in-out infinite;
+}
+
+.role-theme-photographer .takeone-chat-fab:hover,
+.role-theme-photographer .takeone-chat-fab:focus-visible,
+.role-theme-photographer.takeone-chat-fab:hover,
+.role-theme-photographer.takeone-chat-fab:focus-visible {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 0 32px rgba(139, 92, 246, 0.62),
+    0 18px 54px rgba(0, 0, 0, 0.58);
+}
+
+.role-theme-photographer .takeone-chat-fab::before,
+.role-theme-photographer.takeone-chat-fab::before {
+  border-color: rgba(139, 92, 246, 0.28);
+}
+
+.role-theme-photographer .takeone-chat-fab-tooltip,
+.role-theme-photographer.takeone-chat-fab-tooltip {
+  border-color: rgba(139, 92, 246, 0.32);
+}
+
+@keyframes takeoneFabPulsePhotographer {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(139, 92, 246, 0.16),
+      0 0 22px rgba(139, 92, 246, 0.36),
+      0 16px 42px rgba(0, 0, 0, 0.5);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(139, 92, 246, 0.22),
+      0 0 36px rgba(139, 92, 246, 0.58),
+      0 18px 52px rgba(0, 0, 0, 0.56);
+  }
+}
+

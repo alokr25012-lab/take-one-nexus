@@ -1,0 +1,46 @@
+name: Security Report
+description: Report a security vulnerability in TAKE ONE Nexus
+title: "[SECURITY]: "
+labels: ["security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a security vulnerability! Please search existing issues before creating a new one to avoid duplicates.
+        **Note:** If this is a critical security vulnerability, please report it following the guidelines in our [SECURITY.md](SECURITY.md) file.
+  - type: dropdown
+    id: vulnerability_type
+    attributes:
+      label: Vulnerability Type
+      description: Select the type of security vulnerability.
+      options:
+        - XSS (Cross-Site Scripting)
+        - CSRF (Cross-Site Request Forgery)
+        - SQL Injection
+        - Auth Bypass / Privilege Escalation
+        - SSRF (Server-Side Request Forgery)
+        - Dependency Vulnerability
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: Assess the severity of this vulnerability.
+      options:
+        - Low
+        - Medium
+        - High
+        - Critical
+    validations:
+      required: true
+  - type: textarea
+    id: affected_area
+    attributes:
+      label: Affected Area
+      description: Describe the component, endpoint, file, or code location affected.
+      placeholder: |
+        e.g. server.js endpoint /api/users, or frontend cookie configuration
+    validations:
+      required: true

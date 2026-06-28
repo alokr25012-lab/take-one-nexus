@@ -74,6 +74,7 @@ export default function RootLayout({
           <CookieConsentBanner />
         </PostHogProvider>
         <Script src="/scripts/constants/roles.js" strategy="beforeInteractive" />
+        <Script src="/scripts/constants/themes.js" strategy="beforeInteractive" />
         <Script src="/scripts/api/api.js" strategy="afterInteractive" />
         <Script src="/scripts/utils/helpers.js" strategy="afterInteractive" />
         <Script src="/scripts/animations/common.js" strategy="afterInteractive" />

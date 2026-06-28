@@ -3,7 +3,7 @@
 
   <h1>🎬 TAKE ONE NEXUS</h1>
 
-  <p><strong>A cinematic collaborative ecosystem bridging the gap between raw scripts and full-scale production crews.</strong></p>
+  <p><strong>TAKE ONE – NEXUS is an open-source collaboration platform built for filmmakers, creators, photographers, editors, writers, and production teams to connect, collaborate, and build projects together.</strong></p>
 
   <p>
     <a href="https://take-one-nexus.vercel.app"><b>Explore the Live Platform</b></a> •
@@ -12,9 +12,11 @@
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-2.0.0-blue.svg?cacheSeconds=2592000" />
+    <img alt="Version" src="https://img.shields.io/badge/version-2.2.0-blue.svg?cacheSeconds=2592000" />
     <img alt="License: Source-Available" src="https://img.shields.io/badge/License-Source--Available-red.svg" />
     <img alt="Production Ready" src="https://img.shields.io/badge/PRODUCTION_READY-FF4D1A?style=flat&logo=vercel" />
+    <img alt="NSoC 2026" src="https://img.shields.io/badge/NSoC-2026-blue?style=flat" />
+    <img alt="GSSoC 2026" src="https://img.shields.io/badge/GSSoC-2026-orange?style=flat" />
   </p>
 </div>
 
@@ -34,14 +36,19 @@ TAKE ONE Nexus is the definitive digital ecosystem for the next generation of fi
 
 ## ⚡ Core Features
 
-- **🎭 Cinematic Production Profiles:** Live creator profiles serving as a digital reel, complete with skill badges, production history, and portfolio showcase.
-- **🛰️ Secure Transmission (Chat):** Real-time communication suite powered by Pusher. Direct messaging, group chats, live sync, and intelligent unread tracking.
-- **🏆 Live Leaderboard:** Real-time community ranking system powered by our internal Credits engine to reward platform engagement.
-- **💎 Creator Credits & Task System:** Secure, role-based task management where only verified creators can assign and complete production tasks.
-- **🛡️ Production-Grade Security:** Custom stateless double-submit CSRF validation, subdomain cookie sharing, global and per-route rate limiting, CSP/security headers, HTML sanitization, and parameterized SQL queries.
-- **📊 Observability & Analytics:** Integrated PostHog telemetry (GDPR compliant) and Sentry error tracking for robust production monitoring.
-- **✉️ Cinematic Automation:** Resend-powered transactional email system for seamless, cinematic user onboarding and verification.
-- **💳 Payment Integration:** Secure backend-verified Razorpay payment flow guarding public script listings.
+*   **👥 Communities**: Form, discover, and join specialized filmmaking groups and production units.
+*   **📂 Crew Directory & Profiles**: Comprehensive index of creators sorted by roles (Directors, DPs, Editors, Writers, Photographers) with live cinematic portfolios serving as digital reels.
+*   **👑 Role System & Management**: Fine-grained community roles (Owner, Admin, Member) with administrative workflows (member promotion, demotion, removal).
+*   **📩 Invite & Request System**: Send join invitations or manage incoming join requests with dedicated approval dashboards.
+*   **🏆 Live Leaderboard**: Real-time community ranking system based on creative engagement and verified creator achievements.
+*   **⭐ Creator Rating System**: Interactive rating system for creators with submission, editing, and deletion capabilities, notifying creators on new ratings and feeding analytics tracking.
+*   **🎬 Projects & Script Sharing**: Share scripts securely with built-in PDF iframe preview and options for monetization.
+*   **🛡️ Authentication & Verification**: Secure stateless JWT sessions coupled with a full signup-to-verification email flow. Verified creators earn a neon (✦) verified badge.
+*   **🛰️ Real-Time Chat & Notifications**: Real-time communication powered by Pusher. Direct messaging, group chats, live typing, and instant project notifications.
+*   **📊 Observability & Analytics**: Integrated Graphifyy Analytics, PostHog telemetry (GDPR compliant), and Sentry error tracking for monitoring system health and engagement.
+*   **✉️ Email Services**: Resend-powered automated onboarding, verification links, and script moderation reviews.
+*   **💳 Payment Gateway**: Secure backend-verified Razorpay payment verification gating public script publication.
+*   **🖥️ Admin Command Center**: Elevated dashboard for system telemetry, script moderation queues, and user triage.
 
 ---
 
@@ -65,29 +72,35 @@ This project is built using a modern, scalable hybrid architecture.
 
 | Layer | Technology |
 |---|---|
-| **Frontend** | Next.js 14 (App Router), Vanilla HTML/CSS (Static UI), React |
+| **Frontend** | Next.js 16 (App Router), Vanilla HTML/CSS (Static UI), React 19 |
 | **Backend** | Node.js, Express.js |
 | **Database** | MySQL (optimized for TiDB Cloud) |
-| **ORM** | Prisma |
-| **Real-time** | Pusher |
-| **Authentication** | JWT stored in secure HTTP-only cookies |
-| **Mailing** | Resend API |
-| **Observability** | PostHog (Analytics), Sentry (Error Tracking) |
+| **ORM** | Prisma ORM |
+| **Real-time** | Pusher (WebSockets) |
+| **Authentication** | Stateless JWT stored in secure HTTP-only cookies |
+| **Mailing** | Resend API & Nodemailer |
+| **Analytics & Telemetry** | **Graphifyy** (Privacy-friendly), **PostHog** (User experience telemetry) |
+| **Error Monitoring** | **Sentry** (Backend exceptions) |
+| **Payments** | Razorpay (Signature-verified) |
 | **Deployment** | Vercel (Hybrid Serverless & Static) |
+
+For details, refer to [TECH_STACK.md](TECH_STACK.md).
 
 ---
 
 ## 🏗️ Architecture Overview
 
 TAKE ONE Nexus utilizes a **dual-server architecture** running side-by-side on Vercel:
-- **Next.js App (`src/app/`):** Handles dynamic authenticated routes (e.g., `/profile`, `/chat`, `/admin`), PostHog analytics, and Sentry monitoring.
+- **Next.js App (`src/app/`):** Handles dynamic authenticated routes (e.g., `/profile`, `/chat`, `/admin`), PostHog analytics, Sentry monitoring, and Graphifyy integration.
 - **Express Server (`server.js`):** Acts as the API layer (`/api/*`), processes complex SQL queries securely, handles rate limiting, and serves high-performance static HTML files (`public/*.htm`).
 
 ### Subdomain Strategy
 The Administrative Moderation Console is decoupled and hosted on the `admin` subdomain:
 - **Main App**: `takeone-nexus.net.in` (Apex)
 - **Admin Portal**: `admin.takeone-nexus.net.in` (Subdomain)
-- **Shared Session**: Auth cookies share a common apex domain configuration: `domain: '.takeone-nexus.net.in'`. Users with the appropriate `secondary_role` permissions (e.g. `Admin`, `Developer`) can navigate to the admin console without re-authenticating.
+- **Shared Session**: Auth cookies share a common apex domain configuration: `domain: '.takeone-nexus.net.in'`. Users with the appropriate `secondary_role` permissions (e.g. `Admin`) can navigate to the admin console without re-authenticating.
+
+For details, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
@@ -101,6 +114,7 @@ Follow these instructions to set up the project locally.
 - **Database**: MySQL / TiDB instance
 - **Pusher**: Account for real-time WebSockets
 - **Resend**: API key for transactional emails
+- **Graphifyy**: Analytics tracking key (optional)
 - **PostHog**: API key for local analytics tracking (optional)
 - **Sentry**: DSN for error monitoring (optional)
 - **Git**: For version control
@@ -195,9 +209,12 @@ TAKE ONE Nexus is optimized for deployment on **Vercel**.
 
 ---
 
-## 🌐 Community & Collaboration Programs
+## 🌐 Open Source Programs
 
-TAKE ONE Nexus is developed as a source-available filmmaking collaboration platform and participates in community-driven development initiatives including NSoC'26.
+TAKE ONE – NEXUS was developed as an open-source collaboration platform and has been supported by the following community programs:
+
+*   **NSoC'26 (Nexus Spring of Code 2026)**: Project developed under the NSoC'26 timeline to build the foundation of creative and cinematic collaboration tooling.
+*   **GSSoC'26 (GirlScript Summer of Code 2026)**: Participating in GSSoC'26 to expand the community modules, onboarding systems, and collaborative production capabilities.
 
 Contributors are encouraged to explore issues, submit pull requests, improve documentation, and help build tools for filmmakers and creative teams under the project's source-available license.
 
@@ -217,4 +234,3 @@ For full licensing terms, please refer to [LICENSE.md](LICENSE.md).
 
 Maintainership and Production of **Aarush Gupta** and **Alok Rawat**.
 All Rights Reserved.
-

@@ -71,10 +71,8 @@ function splitCollegeCity(value) {
 
 function isAdmin(user) {
     if (!user) return false;
-    return (
-        normalizeRole(user.role) === 'admin' ||
-        normalizeRole(user.secondary_role) === 'admin'
-    );
+    const secondary = String(user.secondary_role || '').toLowerCase();
+    return secondary === 'admin' || secondary === 'founder';
 }
 
 function getAvatarUrl(name, gender, customAvatar) {

@@ -41,20 +41,17 @@ function populateRoleDropdowns() {
     if (typeof window.TAKE_ONE_ROLES === 'undefined') return;
     
     const dropdowns = [
-        { el: document.getElementById('registerRole'), filterDev: true },
-        { el: document.getElementById('editRole'), filterDev: false }
+        document.getElementById('registerRole'),
+        document.getElementById('editRole')
     ];
     
-    dropdowns.forEach(item => {
-        const dropdown = item.el;
+    dropdowns.forEach(dropdown => {
         if (!dropdown) return;
         
         // Preserve any currently selected value if applicable
         const currentVal = dropdown.value;
         
-        const roles = item.filterDev 
-            ? window.TAKE_ONE_ROLES.filter(r => r !== 'Developer')
-            : window.TAKE_ONE_ROLES;
+        const roles = window.TAKE_ONE_ROLES;
         
         dropdown.innerHTML = roles.map(role => 
             `<option value="${role}">${role}</option>`

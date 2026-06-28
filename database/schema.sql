@@ -239,3 +239,35 @@ CREATE TABLE IF NOT EXISTS group_join_requests (
   CONSTRAINT fk_group_join_requests_group FOREIGN KEY (group_id) REFERENCES community_groups(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_group_join_requests_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS portfolio_work (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id INT UNSIGNED NOT NULL,
+  title VARCHAR(180) NOT NULL,
+  genre VARCHAR(80) DEFAULT NULL,
+  synopsis TEXT DEFAULT NULL,
+  media_links TEXT DEFAULT NULL,
+  role_data TEXT DEFAULT NULL,
+  work_type VARCHAR(50) NOT NULL DEFAULT 'Script',
+  status VARCHAR(80) NOT NULL DEFAULT 'Portfolio Item',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_portfolio_work_user_id (user_id),
+  CONSTRAINT fk_portfolio_work_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS user_ratings (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  rated_user_id INT UNSIGNED NOT NULL,
+  rated_by_id INT UNSIGNED NOT NULL,
+  rating TINYINT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_rated_user_rated_by (rated_user_id, rated_by_id),
+  KEY idx_ratings_rated_user_id (rated_user_id),
+  KEY idx_ratings_rated_by_id (rated_by_id),
+  CONSTRAINT fk_ratings_rated_user FOREIGN KEY (rated_user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_ratings_rated_by FOREIGN KEY (rated_by_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
+);

@@ -1,6 +1,6 @@
 const express = require('express');
 const { pool } = require('../config/db');
-const { authenticateUser, requireRole } = require('../middleware/auth');
+const { authenticateUser, requireRole, requireAdmin, requireModerator } = require('../middleware/auth');
 const prisma = require('../utils/prisma');
 const {
   getEmailStatus,
@@ -19,7 +19,7 @@ const router = express.Router();
  * @desc    Check system email connectivity and SMTP health status
  * @access  Private (Admin, Developer)
  */
-router.get('/email/status', authenticateUser, requireRole(['Admin', 'Developer']), async (req, res) => {
+router.get('/email/status', authenticateUser, requireAdmin, async (req, res) => {
   try {
     const status = getEmailStatus();
     let smtpReachable = false;
@@ -56,7 +56,7 @@ router.get('/email/status', authenticateUser, requireRole(['Admin', 'Developer']
  * @desc    Send an administrative test verification email to the logged-in operator
  * @access  Private (Admin, Developer)
  */
-router.post('/email/test', authenticateUser, requireRole(['Admin', 'Developer']), async (req, res) => {
+router.post('/email/test', authenticateUser, requireAdmin, async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT id, name, email
@@ -103,7 +103,7 @@ router.post('/email/test', authenticateUser, requireRole(['Admin', 'Developer'])
  * @desc    Fetch aggregated registration metrics for the past 30 days
  * @access  Private (Admin, Developer, Moderator)
  */
-router.get('/analytics', authenticateUser, requireRole(['Admin', 'Developer', 'Moderator']), async (req, res) => {
+router.get('/analytics', authenticateUser, requireModerator, async (req, res) => {
   try {
     const [userRows] = await pool.query(`
       SELECT DATE(CONVERT_TZ(created_at, '+00:00', '+05:30')) as date, COUNT(*) as count 
@@ -146,7 +146,7 @@ router.get('/analytics', authenticateUser, requireRole(['Admin', 'Developer', 'M
  * @desc    Fetch comprehensive overview metrics for administrative dashboard widgets
  * @access  Private (Admin, Developer, Moderator)
  */
-router.get('/stats', authenticateUser, requireRole(['Admin', 'Developer', 'Moderator']), async (req, res) => {
+router.get('/stats', authenticateUser, requireModerator, async (req, res) => {
   try {
     const [userCount] = await pool.query('SELECT COUNT(*) as count FROM users');
     const [scriptCount] = await pool.query('SELECT COUNT(*) as count FROM scripts WHERE payment_verified = TRUE');
@@ -204,7 +204,7 @@ router.get('/stats', authenticateUser, requireRole(['Admin', 'Developer', 'Moder
  * @desc    Delete analytics events older than retention period
  * @access  Private (Admin, Developer)
  */
-router.post('/analytics/cleanup', authenticateUser, requireRole(['Admin', 'Developer']), async (req, res) => {
+router.post('/analytics/cleanup', authenticateUser, requireAdmin, async (req, res) => {
   try {
     const retentionDays = parseInt(process.env.ANALYTICS_RETENTION_DAYS || '90', 10);
     const cutoffDate = new Date();

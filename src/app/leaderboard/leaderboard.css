@@ -29,7 +29,7 @@ header:hover {
 
 .logo span { color: var(--neon); text-shadow: 0 0 15px var(--neon); }
 
-nav { display: flex; align-items: center; gap: 32px; }
+nav { display: flex; align-items: center; gap: clamp(12px, 1.8vw, 24px); }
 
 nav a {
   font-family: var(--font-main), monospace;
@@ -38,6 +38,7 @@ nav a {
   transition: all 0.3s ease;
   position: relative;
   padding: 8px 0;
+  white-space: nowrap;
 }
 
 nav a:hover, nav a.active { color: var(--cream); }
@@ -342,15 +343,21 @@ footer {
   color: var(--silver);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1200px) {
     header { padding: 0 4vw; }
-    nav { gap: 15px; }
+    nav { gap: 12px; }
     nav a { font-size: 8px; letter-spacing: 0.2em; }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
 
     header {
+        position: relative;
+        top: 0;
+        left: 0;
+        transform: none;
+        width: calc(100% - 40px);
+        margin: 10px auto;
         height: auto;
         padding: 20px 5%;
         flex-direction: column;
@@ -377,6 +384,10 @@ footer {
         width: 100%;
         max-width: 140px;
         text-align: center;
+    }
+
+    .leaderboard-section {
+        padding: 40px 5% 60px;
     }
 }
 

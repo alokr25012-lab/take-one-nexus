@@ -16,8 +16,13 @@ export default function ModerationPage() {
         <a className="logo" href="/">TAKE <span>ONE</span></a>
         <nav>
           <a href="/">Home</a>
+          <a href="/#explore">Discover Projects</a>
+          <a href="/crew">Find Crew</a>
+          <a href="/leaderboard">Leaderboard</a>
+          <a href="/chat">Community</a>
           <a href="/profile">Profile</a>
           <a href="/legal">Legal</a>
+          <a href="/moderation" className="active">Moderation</a>
         </nav>
       </header>
 

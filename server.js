@@ -81,6 +81,9 @@ try {
   const creditsRoutes = require('./routes/credits');
   const paymentRoutes = require('./routes/payments');
   const communityRoutes = require('./routes/community');
+  const portfolioRoutes = require('./routes/portfolio');
+  const ratingRoutes = require('./routes/ratings');
+  const servicesRoutes = require('./routes/services');
 
 const PORT = process.env.PORT || 3000;
 
@@ -110,6 +113,7 @@ app.use(helmet({
   xFrameOptions: { action: "deny" }, // Hardened clickjacking defence layout as per criteria
   referrerPolicy: { policy: "strict-origin-when-cross-origin" },
   xContentTypeOptions: true,
+  xssFilter: true,
   hsts: {
     maxAge: 31536000, // 1 year runtime enforcement
     includeSubDomains: true,
@@ -230,6 +234,9 @@ app.use('/api/payments', paymentRateLimiter, paymentRoutes);
 app.use('/api/community/create-order', paymentRateLimiter);
 app.use('/api/community/verify-payment', paymentRateLimiter);
 app.use('/api/community', communityRoutes);
+app.use('/api/portfolio', portfolioRoutes);
+app.use('/api/ratings', ratingRoutes);
+app.use('/api/services', servicesRoutes);
 
 app.post('/api/groups/create', (req, res) => {
   res.status(403).json({

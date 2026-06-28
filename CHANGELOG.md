@@ -6,11 +6,62 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [Unreleased / Source-Available Prep] - 2026-05
+## [2.2.0] - 2026-06-21
 
 ### Added
-- **NSoC'26 Integration**: Audited and updated the entire documentation workspace to properly acknowledge and integrate support for NSoC'26 (Nexus Summer of Code '26). Added `Open Source Programs` sections across core repo manuals.
-- **Source-Available Documentation**: Complete overhaul of documentation to make the repository production-grade and friendly for NSoC'26 and GSSoC 2026 contributors. Added `README.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `ROADMAP.md`, and `SECURITY.md`.
+- **Rating Deletion Flow**: Allows creators to delete a rating they previously submitted, with a confirmation modal, instantly recalculating and updating stats.
+- **Rating Notifications**: Triggers standard notifications specifically for new creator ratings, while bypassing updates or deletions.
+- **Graphifyy Analytics Event Instrumentation**: Injected persistent database logging for `profile_rated` and `rating_removed` events.
+
+---
+
+## [2.1.0] - 2026-06-18
+
+### Added
+- **Group Member Management**: Added full member management dashboard within Group Details panel. Users with Admin or Owner permissions can promote, demote, or remove operatives.
+- **Join Requests & Invitations Panels**: Dedicated tabbed interfaces inside Community details to approve/reject join requests and send, track, or cancel invitations.
+- **Graphifyy Analytics Integration**: Added a privacy-friendly, cookies-free analytics tracker for user engagement, visit telemetry, and page speed checks.
+- **Logo Cache-Busting**: Appended custom query hashes on uploaded group/community logos to force client-side re-render on updates.
+
+### Changed
+- **CSRF Local Development Support**: Modified CSRF verification to bypass secure cookie flags in local dev environments (`NODE_ENV !== 'production'`), resolving localhost authentication loops.
+- **Messaging Permissions Logic**: Restructured permissions to ensure Group Owners, Admins, and Directors can still message even if communication gating is active.
+
+### Fixed
+- **Session Logout Coexistence**: Fixed cookie removal where `maxAge` configurations previously blocked immediate token clearance upon logout.
+- **Community Chat Navbar overlap**: Repaired overlapping header elements on the Community Chat page on small viewports.
+- **Profile Layout Border & Nav**: Addressed mobile navbar layout errors and stacked sidebar borders on tablet viewports.
+- **Hybrid Cursor Response**: Fixed custom cursor feedback anomalies on touch and hybrid devices.
+
+---
+
+## [2.0.0] - 2026-05-26
+
+### Added
+- **Razorpay Script Gateway**: Integrated Razorpay payment flow guarding public script submissions.
+- **Audited Deletions**: Added backend-authorized script deletion routes for admins and moderators with audit trailing logs (`SCRIPT_DELETED`).
+- **Task Management System**: Added `/admin` console controls for creating tasks, approving/rejecting user submissions, manual credit awards, and activity logs.
+
+### Fixed
+- **Payment Cleanup**: Automatic draft cleanup job for failed, cancelled, invalid, or expired Razorpay payments.
+
+---
+
+## [1.2.0] - 2026-05-24
+
+### Added
+- **Verified Creator Badge**: Added `email_verified` to `GET /api/users/search` and `GET /api/users/leaderboard` SQL routes. Renders a neon verified badge (✦) next to verified names on the leaderboard, profile, and crew pages.
+- **Prisma Schema Update**:
+  - `Script` model updated with `approval_status` (pending/approved/rejected), `approved_by`, `approved_at`, and `moderation_notes`.
+  - `Issue` model updated with `priority` (low/medium/high), `assigned_admin`, and `resolved_at`.
+- **Script Review & Moderation API**:
+  - `PATCH /api/scripts/:id/moderate` triggers status updates and automated rejection feedback email dispatch via Resend.
+  - Broadcasts real-time `SCRIPT_MODERATED` status changes via Pusher WebSockets.
+- **Standalone Moderation Hub (`scripts-platform/`)**:
+  - Admin login portal under JWT session verification (`SP_JWT_SECRET`).
+  - Interactive moderation queue and PDF iframe script viewer.
+  - Interactive issue management console supporting status transition logs and priority updates.
+  - Strict security headers (`CSP`, `X-Frame-Options: DENY`, `noindex` tags).
 
 ---
 
@@ -26,7 +77,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **PostHog Analytics**: Consent-gated analytics, session replay (all inputs masked), and feature flags via `PostHogProvider`.
 - **Sentry Error Monitoring**: Backend-only error capture with PII scrubbing (`beforeSend` hook strips password/token/secret fields).
 - **Security Headers**: Strict CSP, X-Frame-Options, and nosniff enabled to prevent XSS and clickjacking.
-- **Task Management RBAC**: Strictly gated task assignment endpoints; only authorized `creator` roles can assign tasks to crew.
+- **Task Management RBAC**: Gated task assignment endpoints; only authorized `creator` roles can assign tasks to crew.
 - **Cyberpunk Email Templates**: `src/lib/email-templates/` — HTML templates for verification and password reset matching the platform's cinematic design system.
 
 ### Changed
@@ -81,10 +132,3 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Initial project scaffold.
 - Basic TiDB integration.
 - Static UI shell (Project/Crew/Profile screens).
-
-## 2026-05-26
-
-- Blocked direct unpaid script creation and moved script submission behind backend Razorpay signature verification.
-- Added script draft cleanup for failed, cancelled, invalid, and expired payments.
-- Added audited script deletion with moderator/admin checks.
-- Added admin task creation controls and backend task submission approval/rejection with credit and leaderboard integration.

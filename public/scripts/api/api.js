@@ -170,10 +170,51 @@ const API = (() => {
         });
       },
       createPortfolio(payload) {
-        return request('/api/scripts/portfolio', {
+        return request('/api/portfolio', {
           method: 'POST',
           body: JSON.stringify(payload)
         });
+      }
+    },
+    portfolio: {
+      list(userId) {
+        return request(`/api/portfolio?userId=${userId}`);
+      },
+      create(payload) {
+        return request('/api/portfolio', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+      },
+      update(id, payload) {
+        return request(`/api/portfolio/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+      },
+      delete(id) {
+        return request(`/api/portfolio/${id}`, {
+          method: 'DELETE'
+        });
+      }
+    },
+    ratings: {
+      getStatus(ratedUserId) {
+        return request(`/api/ratings/status/${ratedUserId}`);
+      },
+      submit(ratedUserId, rating) {
+        return request('/api/ratings', {
+          method: 'POST',
+          body: JSON.stringify({ ratedUserId, rating })
+        });
+      },
+      delete(ratedUserId) {
+        return request(`/api/ratings/${ratedUserId}`, {
+          method: 'DELETE'
+        });
+      },
+      getLeaderboard() {
+        return request('/api/ratings/leaderboard');
       }
     },
     requests: {

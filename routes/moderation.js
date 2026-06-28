@@ -1,6 +1,6 @@
 const express = require('express');
 const { pool } = require('../config/db');
-const { authenticateUser, requireRole, requireVerified } = require('../middleware/auth');
+const { authenticateUser, requireRole, requireVerified, requireModerator } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -47,7 +47,7 @@ router.post('/reports', authenticateUser, requireVerified, async (req, res) => {
   }
 });
 
-router.get('/reports', authenticateUser, requireRole(['Moderator', 'Admin', 'Developer']), async (req, res) => {
+router.get('/reports', authenticateUser, requireModerator, async (req, res) => {
   try {
     const status = String(req.query.status || '').trim().toLowerCase();
     const params = [];
@@ -96,7 +96,7 @@ router.get('/reports', authenticateUser, requireRole(['Moderator', 'Admin', 'Dev
   }
 });
 
-router.patch('/reports/:id', authenticateUser, requireRole(['Moderator', 'Admin', 'Developer']), async (req, res) => {
+router.patch('/reports/:id', authenticateUser, requireModerator, async (req, res) => {
   try {
     const status = String(req.body.status || '').trim().toLowerCase();
     const notes = String(req.body.moderator_notes || '').trim();

@@ -211,3 +211,13 @@ If issues persist:
 ---
 
 **Last Updated:** June 2026
+
+---
+
+## 🌐 Community & Collaboration Programs
+
+TAKE ONE – NEXUS is developed as an open-source collaboration platform and participates in community-driven development initiatives:
+* **NSoC'26 (Nexus Spring of Code 2026)**: Focuses on core modules, telemetry, and platform security.
+* **GSSoC'26 (GirlScript Summer of Code 2026)**: Focuses on communities, roles, invite/request boards, and responsive layouts.
+
+Contributors are encouraged to explore issues, submit pull requests, improve documentation, and help build tools for filmmakers and creative teams under the project's source-available license.

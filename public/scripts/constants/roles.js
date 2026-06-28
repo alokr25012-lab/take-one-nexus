@@ -1,11 +1,11 @@
 const TAKE_ONE_ROLES = [
   "Director",
+  "Photographer",
   "Cinematographer / DP",
   "Writer",
   "Editor",
   "Sound Designer",
   "Designer",
-  "Developer",
   "Actor",
   "Producer",
   "Lighting Crew",
@@ -15,12 +15,12 @@ const TAKE_ONE_ROLES = [
 
 const ROLE_ICONS = {
   "Director": "🎬",
+  "Photographer": "📸",
   "Cinematographer / DP": "📷",
   "Writer": "✍",
   "Editor": "✂",
   "Sound Designer": "🎙",
   "Designer": "🎨",
-  "Developer": "💻",
   "Actor": "🎭",
   "Producer": "📋",
   "Lighting Crew": "💡",

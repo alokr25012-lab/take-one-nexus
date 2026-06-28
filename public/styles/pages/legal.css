@@ -65,8 +65,8 @@ nav a:hover,
 
 nav {
   display: flex;
-  gap: 22px;
-  flex-wrap: wrap;
+  gap: clamp(12px, 1.8vw, 22px);
+  flex-wrap: nowrap;
 }
 
 nav a {
@@ -75,6 +75,7 @@ nav a {
   font-size: 9px;
   letter-spacing: 0.26em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .legal-shell {
@@ -152,5 +153,25 @@ li {
 @media (max-width: 900px) {
   .legal-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1024px) {
+  header {
+    height: auto;
+    padding: 15px 5%;
+    flex-direction: column;
+    gap: 15px;
+    border-radius: 20px;
+  }
+  nav {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+  }
+  nav a {
+    font-size: 8px;
+    letter-spacing: 0.18em;
   }
 }

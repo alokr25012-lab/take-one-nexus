@@ -2,7 +2,49 @@
 
 All notable changes to the TAKE ONE Nexus platform will be documented in this file.
 
-The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project aims to eventually adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [2.2.0] — Creator Rating Deletion, Notifications & Analytics - 2026-06-21
+
+### Added
+- **Rating Deletion Flow**: Allows creators to delete a rating they previously submitted, with a confirmation modal, instantly recalculating and updating stats.
+- **Rating Notifications**: Triggers standard notifications specifically for new creator ratings, while bypassing updates or deletions.
+- **Graphifyy Analytics Event Instrumentation**: Injected persistent database logging for `profile_rated` and `rating_removed` events.
+
+---
+
+## [2.1.0] — Community, Permissions & Observability Hardening - 2026-06-18
+
+### Added
+- **Group Member Management Dashboard**: Full-fledged admin UI in chat details for promoting, demoting, and removing community operatives.
+- **Join Request Board**: Dedicated approval queues gating community entries.
+- **Community Invitation Panel**: Dashboard for moderators/owners to track, resend, or cancel invitations.
+- **Graphifyy Analytics**: Lightweight, cookies-free, privacy-preserving web analytics tracking visits and performance metrics.
+- **Logo Cache-Busting**: Appended instant-refresh hash tokens to uploaded group and community logos to prevent UI caching lag.
+- **Responsive Layout Audits**: Repaired and updated mobile navigation layouts:
+  - Fixed Community Chat Navbar layout overlaps.
+  - Fixed profile stacked sidebar and mobile separators.
+  - Stacked modal forms on small screens.
+  - Fixed hybrid device custom cursor behavior.
+
+### Changed
+- **CSRF Local Dev Middleware**: Updates to allow non-secure cookies on development environments (`http://localhost`) while keeping `secure` attributes active in production.
+- **Session Logout Cookie Options**: Fixed the `maxAge` configuration bug that prevented immediate cookie clearing during user sign-out.
+- **Messaging RBAC Policies**: Allowed Community Owners, Admins, and Directors to override communication locks to send important notifications.
+
+---
+
+## [2.0.0] — Payment Gate & Creator Task Engine - 2026-05-26
+
+### Added
+- **Razorpay Script Gateway**: Gated all public script uploads behind secure, backend-verified Razorpay payments. Scripts remain in draft status until signatures match.
+- **Audited Deletions**: Added backend-authorized script deletion routes for admins and moderators with `SCRIPT_DELETED` system logs.
+- **Task Management Panel**: Added `/admin` console controls for creating tasks, approving/rejecting user submissions, manual credit disbursements, and activity logging.
+
+### Fixed
+- **Payment Cleanup Job**: Automated draft script garbage collection for cancelled, expired, or invalid transaction logs.
 
 ---
 
@@ -91,11 +133,11 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ---
 
-*(For older legacy changes, refer to git commit history prior to May 2026)*
+## 🌐 Community & Collaboration Programs
 
-## 2026-05-26 Critical Fixes
+TAKE ONE – NEXUS is developed as an open-source collaboration platform and has been supported by the following community programs:
 
-- Added audited script deletion for moderators/admins with backend authorization and `SCRIPT_DELETED` logs.
-- Hardened script submission so only Razorpay-verified payments can promote drafts into `scripts`.
-- Added script payment status fields and filtered public script surfaces to paid, verified scripts.
-- Added `/admin` task creation plus backend task submission approval/rejection, manual credit awards, activity logs, and leaderboard refresh.
+*   **NSoC'26 (Nexus Spring of Code 2026)**: Project developed under the NSoC'26 timeline to build the foundation of creative and cinematic collaboration tooling.
+*   **GSSoC'26 (GirlScript Summer of Code 2026)**: Participating in GSSoC'26 to expand the community modules, onboarding systems, and collaborative production capabilities.
+
+Contributors are encouraged to explore issues, submit pull requests, improve documentation, and help build tools for filmmakers and creative teams under the project's source-available license.

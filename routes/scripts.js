@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('fs/promises');
 const path = require('path');
 const { pool } = require('../config/db');
-const { authenticateUser, requireVerified, requireRole } = require('../middleware/auth');
+const { authenticateUser, requireVerified, requireRole, requireAdmin } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rateLimiter');
 const Pusher = require('pusher');
 
@@ -316,84 +316,7 @@ router.get('/search', searchLimiter, async (req, res) => {
   }
 });
 
-router.post('/portfolio', authenticateUser, requireVerified, portfolioLimiter, async (req, res) => {
-  try {
-    const {
-      title,
-      genre,
-      synopsis,
-      roles_needed,
-      work_type,
-      media_links,
-      role_data,
-      poster_url
-    } = req.body;
-
-    if (!title || !String(title).trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Project title is required'
-      });
-    }
-
-    const [result] = await pool.query(
-      `INSERT INTO scripts
-      (
-        user_id,
-        title,
-        genre,
-        synopsis,
-        roles_needed,
-        work_type,
-        media_links,
-        role_data,
-        poster_url,
-        status,
-        payment_status,
-        payment_verified,
-        approval_status,
-        moderation_notes,
-        created_at,
-        updated_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-      [
-        req.user.id,
-        String(title).trim(),
-        genre || null,
-        synopsis || null,
-        roles_needed || null,
-        work_type || 'Script',
-        media_links || null,
-        role_data || null,
-        poster_url || null,
-        'Portfolio Item',
-        'portfolio',
-        false,
-        'portfolio',
-        'Portfolio item — exempt from moderation queue'
-      ]
-    );
-
-    const [rows] = await pool.query(
-      'SELECT * FROM scripts WHERE id = ? LIMIT 1',
-      [result.insertId]
-    );
-
-    res.status(201).json({
-      success: true,
-      message: 'Portfolio item added successfully',
-      data: rows[0]
-    });
-  } catch (error) {
-    console.error('Portfolio insert error:', error.message);
-
-    res.status(500).json({
-      success: false,
-      message: 'Could not add portfolio item'
-    });
-  }
-});
+// Legacy portfolio endpoint removed. All portfolio work goes through /api/portfolio.
 
 router.post('/', authenticateUser, requireVerified, createLimiter, async (req, res) => {
   try {
@@ -588,7 +511,7 @@ router.delete('/:id', authenticateUser, deleteLimiter, async (req, res) => {
  * Approve or reject a script (Admin only)
  * Body: { action: 'approved' | 'rejected' | 'pending', moderation_notes?: string }
  */
-router.patch('/:id/moderate', authenticateUser, requireRole(['Admin', 'Developer']), moderationLimiter, async (req, res) => {
+router.patch('/:id/moderate', authenticateUser, requireAdmin, moderationLimiter, async (req, res) => {
   try {
     const scriptId = Number(req.params.id);
     const { action, moderation_notes } = req.body;

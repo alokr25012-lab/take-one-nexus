@@ -111,8 +111,12 @@ function renderSkillBadges(skills) {
         if (typeof updateStat === 'function') updateStat('skillsCount', 0);
         return;
     }
-
-    wrap.innerHTML = items.map(skill => `<span class="badge">${skill}</span>`).join('');
+    wrap.innerHTML = '';
+    items.forEach(skill => {const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = skill;
+        wrap.appendChild(badge);
+    });
     if (typeof updateStat === 'function') updateStat('skillsCount', items.length);
 }
 
@@ -171,7 +175,7 @@ function renderPortfolio(profile) {
     if (!detailsWrap || !gridWrap) return;
 
     const role = profile.role || 'Other';
-    const scripts = profile.scripts || [];
+    const portfolioWorks = profile.portfolioWorks || [];
     
     // 1. Render Role-Specific Details Cards
     let detailsHtml = '';
@@ -199,11 +203,22 @@ function renderPortfolio(profile) {
                 <p><a href="${profile.portfolio || '#'}" target="_blank">View Reel →</a></p>
             </div>
         `;
+    } else if (role.includes('Photographer')) {
+         detailsHtml = `
+            <div class="portfolio-card-mini">
+                <strong>Camera & Lenses</strong>
+                <p>${profile.skills || 'Add gear/skills'}</p>
+            </div>
+            <div class="portfolio-card-mini">
+                <strong>Portfolio</strong>
+                <p><a href="${profile.portfolio || '#'}" target="_blank">View Gallery →</a></p>
+            </div>
+        `;
     } else {
         detailsHtml = `
             <div class="portfolio-card-mini">
                 <strong>Creator Stats</strong>
-                <p>${scripts.length} Projects · ${profile.credits} Credits</p>
+                <p>${portfolioWorks.length} Projects · ${profile.credits} Credits</p>
             </div>
             <div class="portfolio-card-mini">
                 <strong>Bio</strong>
@@ -215,18 +230,19 @@ function renderPortfolio(profile) {
     detailsWrap.innerHTML = detailsHtml;
 
     const authUser = API.auth.getUser();
-    isOwner = !!(authUser && profile.id === authUser.id);
+    isOwner = !!(authUser && Number(profile.id) === Number(authUser.id));
 
     // 2. Render Featured Work Cards
-    if (scripts.length === 0) {
-        gridWrap.innerHTML = `
-            <div class="collab-empty">
-                <p>No projects uploaded to showcase yet.</p>
-                ${isOwner ? '<button onclick="openEditWorkModal()" class="btn-sm">Add Work →</button>' : ''}
+    let gridHtml = '';
+    
+    if (portfolioWorks.length === 0) {
+        gridHtml = `
+            <div class="collab-empty" style="grid-column: 1 / -1; text-align: center;">
+                <p>${isOwner ? 'No featured work added yet.' : 'No projects uploaded to showcase yet.'}</p>
             </div>
         `;
     } else {
-        gridWrap.innerHTML = scripts.map((script, i) => {
+        gridHtml = portfolioWorks.map((script, i) => {
             let roleInfo = '';
             if (script.role_data) {
                 try {
@@ -258,6 +274,21 @@ function renderPortfolio(profile) {
             `;
         }).join('');
     }
+
+    // Always append the "+ Add Work" card for owner
+    if (isOwner) {
+        gridHtml += `
+            <div class="portfolio-item-card add-work-card" onclick="openEditWorkModal()"
+                 style="border: 2px dashed rgba(255, 77, 26, 0.3); display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 200px; cursor: pointer; background: rgba(255, 77, 26, 0.02); transition: all 0.3s ease; gap: 8px;"
+                 onmouseover="this.style.borderColor='var(--primary)'; this.style.background='rgba(255, 77, 26, 0.06)'"
+                 onmouseout="this.style.borderColor='rgba(255, 77, 26, 0.3)'; this.style.background='rgba(255, 77, 26, 0.02)'">
+                <span style="font-size: 32px; color: var(--primary); line-height: 1;">+</span>
+                <span style="font-size: 13px; color: var(--primary); font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em;">Add Work</span>
+            </div>
+        `;
+    }
+
+    gridWrap.innerHTML = gridHtml;
 }
 
 let currentProfileData = null;
@@ -276,30 +307,33 @@ function notifyProfile(message) {
     }
 }
 
-function upsertLocalPortfolioItem(script, remove = false) {
-    if (!currentProfileData || !script || !script.id) return;
+function upsertLocalPortfolioItem(item, remove = false) {
+    if (!currentProfileData || !item || !item.id) return;
 
-    const scripts = Array.isArray(currentProfileData.scripts)
-        ? currentProfileData.scripts.slice()
+    const works = Array.isArray(currentProfileData.portfolioWorks)
+        ? currentProfileData.portfolioWorks.slice()
         : [];
-    const index = scripts.findIndex(item => Number(item.id) === Number(script.id));
+    const index = works.findIndex(x => Number(x.id) === Number(item.id));
 
     if (remove) {
-        if (index >= 0) scripts.splice(index, 1);
+        if (index >= 0) works.splice(index, 1);
     } else if (index >= 0) {
-        scripts[index] = { ...scripts[index], ...script };
+        works[index] = { ...works[index], ...item };
     } else {
-        scripts.unshift(script);
+        works.unshift(item);
     }
 
-    currentProfileData.scripts = scripts;
-    renderProjects(scripts);
+    currentProfileData.portfolioWorks = works;
     renderPortfolio(currentProfileData);
 }
 
 function populateProfile(profile) {
     if (!profile) return;
     currentProfileData = profile;
+    
+    if (typeof applyRoleTheme === 'function') {
+        applyRoleTheme(profile.role);
+    }
     
     const nameEl = document.getElementById('profileName');
     if (nameEl) {
@@ -349,14 +383,259 @@ function populateProfile(profile) {
     renderPortfolio(profile);
 
     if (typeof updateStat === 'function') updateStat('profileCity', profile.city || '--');
+    
+    // Initialize rating engine component
+    initCreatorRatings(profile.id);
 }
 
+async function initCreatorRatings(profileId, isEditing = false) {
+    const container = document.getElementById('creatorRatingSection');
+    if (!container) return;
+
+    // Show visual loading feedback only if loading for the first time
+    if (!container.querySelector('.rating-stars-display')) {
+        container.innerHTML = `
+            <div class="rating-loading" style="font-size: 11px; color: var(--cyan); letter-spacing: 0.1em; opacity: 0.7; text-align: center; padding: 4px;">
+                LOADING RATING...
+            </div>
+        `;
+    }
+
+    try {
+        const authUser = API.auth.getUser();
+        const isViewerOwner = !!(authUser && Number(authUser.id) === Number(profileId));
+
+        const res = await API.ratings.getStatus(profileId);
+        if (!res.success || !res.data) {
+            container.innerHTML = `
+                <div class="rating-error" style="font-size: 11px; color: var(--neon); letter-spacing: 0.1em; text-align: center; padding: 4px;">
+                    RATING SYSTEM OFFLINE
+                </div>
+            `;
+            return;
+        }
+
+        const { averageRating, ratingCount, userRating } = res.data;
+
+        // Render stars structure
+        let starsHtml = '';
+        const currentAvg = Math.round(averageRating || 0);
+
+        // Stars are interactive if viewer is not the profile owner AND is logged in AND (they have not rated yet OR they are in editing mode)
+        const shouldBeInteractive = !isViewerOwner && authUser && (userRating === 0 || isEditing);
+        const activeStarCount = userRating || currentAvg;
+
+        for (let i = 1; i <= 5; i++) {
+            const isActive = i <= activeStarCount;
+            const isInteractiveClass = shouldBeInteractive ? 'interactive' : '';
+            starsHtml += `<span class="rating-star-icon ${isActive ? 'active' : ''} ${isInteractiveClass}" data-value="${i}">★</span>`;
+        }
+
+        let subtextHtml = '';
+        if (isViewerOwner) {
+            subtextHtml = `<div class="rating-subtext">Self-rating is disabled</div>`;
+        } else if (!authUser) {
+            subtextHtml = `<div class="rating-subtext"><a href="/?auth=login" style="color: var(--neon); text-decoration: none;">Login</a> to rate</div>`;
+        } else if (userRating > 0) {
+            if (isEditing) {
+                subtextHtml = `
+                    <div class="rating-subtext">Select a new rating or <span class="rating-action-btn cancel-edit-btn" style="color: var(--cyan); cursor: pointer; text-decoration: underline;">Cancel</span></div>
+                `;
+            } else {
+                subtextHtml = `
+                    <div class="rating-subtext">Your rating: ${userRating} ★</div>
+                    <div class="rating-actions" style="margin-top: 8px; display: flex; gap: 12px; justify-content: center; font-size: 11px;">
+                        <span class="rating-action-btn edit-rating-btn" style="color: var(--cyan); cursor: pointer; text-decoration: underline; letter-spacing: 0.05em;">Edit Rating</span>
+                        <span style="color: var(--border);">|</span>
+                        <span class="rating-action-btn remove-rating-btn" style="color: var(--neon); cursor: pointer; text-decoration: underline; letter-spacing: 0.05em;">Remove Rating</span>
+                    </div>
+                `;
+            }
+        } else {
+            subtextHtml = `<div class="rating-subtext">Tap stars to rate this creator</div>`;
+        }
+
+        container.innerHTML = `
+            <div class="rating-title">Creator Rating</div>
+            <div class="rating-stars-display">
+                ${starsHtml}
+            </div>
+            <div class="rating-stats-text">
+                <span class="rating-score-bold">${averageRating ? parseFloat(averageRating).toFixed(1) : '0.0'}</span>
+                <span>/ 5.0</span>
+                <span>(${ratingCount} ${ratingCount === 1 ? 'rating' : 'ratings'})</span>
+            </div>
+            ${subtextHtml}
+        `;
+
+        // Bind interactive event listeners if needed
+        if (shouldBeInteractive) {
+            container.querySelectorAll('.rating-star-icon.interactive').forEach(star => {
+                star.addEventListener('mouseover', function() {
+                    const hoverVal = parseInt(this.getAttribute('data-value'));
+                    container.querySelectorAll('.rating-star-icon.interactive').forEach(s => {
+                        const sVal = parseInt(s.getAttribute('data-value'));
+                        if (sVal <= hoverVal) {
+                            s.classList.add('active');
+                        } else {
+                            s.classList.remove('active');
+                        }
+                    });
+                });
+
+                star.addEventListener('mouseout', function() {
+                    container.querySelectorAll('.rating-star-icon.interactive').forEach(s => {
+                        const sVal = parseInt(s.getAttribute('data-value'));
+                        const checkVal = userRating || currentAvg;
+                        if (sVal <= checkVal) {
+                            s.classList.add('active');
+                        } else {
+                            s.classList.remove('active');
+                        }
+                    });
+                });
+
+                star.addEventListener('click', async function() {
+                    const clickVal = parseInt(this.getAttribute('data-value'));
+                    try {
+                        const submitRes = await API.ratings.submit(profileId, clickVal);
+                        if (submitRes.success) {
+                            notifyProfile('Rating submitted ✦');
+                            // Re-init ratings (exiting edit mode)
+                            initCreatorRatings(profileId, false);
+                        } else {
+                            notifyProfile(submitRes.message || 'Could not submit rating');
+                        }
+                    } catch (err) {
+                        console.error('Submit rating error:', err);
+                        notifyProfile(err.message || 'Connection error');
+                    }
+                });
+            });
+        }
+
+        // Bind action button listeners
+        if (userRating > 0) {
+            const editBtn = container.querySelector('.edit-rating-btn');
+            if (editBtn) {
+                editBtn.addEventListener('click', () => {
+                    initCreatorRatings(profileId, true);
+                });
+            }
+
+            const removeBtn = container.querySelector('.remove-rating-btn');
+            if (removeBtn) {
+                removeBtn.addEventListener('click', () => {
+                    openDeleteRatingConfirmation(profileId);
+                });
+            }
+
+            const cancelBtn = container.querySelector('.cancel-edit-btn');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', () => {
+                    initCreatorRatings(profileId, false);
+                });
+            }
+        }
+
+    } catch (error) {
+        console.error('Error initializing creator ratings:', error);
+        container.innerHTML = `
+            <div class="rating-error" style="font-size: 11px; color: var(--neon); letter-spacing: 0.1em; text-align: center; padding: 4px;">
+                RATING SYSTEM OFFLINE
+            </div>
+        `;
+    }
+}
+
+function openDeleteRatingConfirmation(profileId) {
+    let modal = document.getElementById('deleteRatingModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'deleteRatingModal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 400px; padding: 24px; text-align: center; border-radius: 4px;">
+                <h2 style="font-family: 'Bebas Neue', sans-serif; font-size: 24px; color: var(--neon); margin-bottom: 16px;">Remove Rating</h2>
+                <p style="font-size: 14px; color: var(--text); margin-bottom: 24px; line-height: 1.5;">Remove your rating for this creator?</p>
+                <div class="modal-actions" style="display: flex; gap: 12px; justify-content: center;">
+                    <button class="ctab modal-cancel-btn" style="background: transparent; border: 1px solid var(--border); color: var(--text); padding: 8px 16px; cursor: pointer; border-radius: 4px;">Cancel</button>
+                    <button class="ctab modal-remove-btn" style="background: var(--neon); color: var(--machine); border: none; padding: 8px 16px; cursor: pointer; font-weight: bold; border-radius: 4px;">Remove Rating</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Add events
+        modal.querySelector('.modal-cancel-btn').addEventListener('click', () => {
+            closeDeleteRatingModal();
+        });
+        
+        modal.querySelector('.modal-remove-btn').addEventListener('click', async () => {
+            closeDeleteRatingModal();
+            await executeRatingDeletion(profileId);
+        });
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeDeleteRatingModal();
+        });
+    }
+    
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeDeleteRatingModal() {
+    const modal = document.getElementById('deleteRatingModal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+    document.body.style.overflow = '';
+}
+
+async function executeRatingDeletion(profileId) {
+    try {
+        const deleteRes = await API.ratings.delete(profileId);
+        if (deleteRes.success) {
+            notifyProfile('Rating removed ✦');
+            // Re-init ratings after deletion to show updated scores
+            initCreatorRatings(profileId, false);
+        } else {
+            notifyProfile(deleteRes.message || 'Could not remove rating');
+        }
+    } catch (err) {
+        console.error('Delete rating error:', err);
+        notifyProfile(err.message || 'Connection error');
+    }
+}
+
+
+let loadProfileAttempts = 0;
 async function loadProfile() {
-    if (typeof API === 'undefined' || !API.auth || !API.users) return;
+    if (typeof API === 'undefined' || !API.auth || !API.users || !API.ratings || !API.portfolio) {
+        loadProfileAttempts++;
+        if (loadProfileAttempts > 50) {
+            console.error('API helper failed to load after 5 seconds.');
+            notifyProfile('Connection error. Please refresh.');
+            return;
+        }
+        setTimeout(loadProfile, 100);
+        return;
+    }
+    loadProfileAttempts = 0;
 
     const urlParams = new URLSearchParams(window.location.search);
     const targetId = urlParams.get('id');
     const authUser = API.auth.getUser();
+
+    const gridWrap = document.getElementById('portfolioGrid');
+    if (gridWrap) {
+        gridWrap.innerHTML = `
+            <div class="portfolio-loading" style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--cyan); letter-spacing: 0.2em;">
+                SYNCHRONIZING PORTFOLIO...
+            </div>
+        `;
+    }
     
     // If we have a targetId and it's not us, fetch public profile
     if (targetId && (!authUser || authUser.id !== parseInt(targetId))) {
@@ -371,10 +650,26 @@ async function loadProfile() {
                     if (el.id !== 'messageBtn') el.style.display = 'none';
                 });
                 return;
+            } else {
+                if (gridWrap) {
+                    gridWrap.innerHTML = `
+                        <div class="portfolio-error" style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--neon); letter-spacing: 0.2em;">
+                            PORTFOLIO NOT FOUND
+                        </div>
+                    `;
+                }
             }
         } catch (err) {
             console.error('Error loading public profile:', err);
+            if (gridWrap) {
+                gridWrap.innerHTML = `
+                    <div class="portfolio-error" style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--neon); letter-spacing: 0.2em;">
+                        PORTFOLIO TRANSMISSION FAILED
+                    </div>
+                `;
+            }
         }
+        return;
     }
 
     // Default to own profile
@@ -391,9 +686,24 @@ async function loadProfile() {
             populateProfile(response.data);
             loadCollaborationRequests(authUser.id);
             loadNotifications(authUser.id);
+        } else {
+            if (gridWrap) {
+                gridWrap.innerHTML = `
+                    <div class="portfolio-error" style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--neon); letter-spacing: 0.2em;">
+                        PORTFOLIO NOT FOUND
+                    </div>
+                `;
+            }
         }
     } catch (err) {
         console.error('Profile load failed:', err);
+        if (gridWrap) {
+            gridWrap.innerHTML = `
+                <div class="portfolio-error" style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--neon); letter-spacing: 0.2em;">
+                    PORTFOLIO TRANSMISSION FAILED
+                </div>
+            `;
+        }
         if (typeof showToast === 'function') showToast(`Could not load profile ✦`);
     }
 }
@@ -794,6 +1104,10 @@ const ROLE_FIELDS = {
     'DP': [
         { id: 'cameraUsed', label: 'Camera Gear', type: 'text', placeholder: 'e.g. RED Komodo, Sony A7SIII' },
         { id: 'visualStyle', label: 'Visual Style', type: 'text', placeholder: 'e.g. High Contrast, Anamorphic' }
+    ],
+    'PHOTOGRAPHER': [
+        { id: 'cameraUsed', label: 'Camera Body & Lenses', type: 'text', placeholder: 'e.g. Sony A7R V, 85mm f/1.4' },
+        { id: 'photographyStyle', label: 'Photography Style', type: 'text', placeholder: 'e.g. Cinematic Stills, BTS, Editorial' }
     ]
 };
 
@@ -856,7 +1170,7 @@ window.openEditWorkModal = function(scriptId = null) {
 
     if (scriptId) {
         title.textContent = 'Edit Portfolio Work';
-        const script = currentProfileData?.scripts?.find(s => Number(s.id) === Number(scriptId));
+        const script = currentProfileData?.portfolioWorks?.find(s => Number(s.id) === Number(scriptId));
         if (script) {
             document.getElementById('workTitle').value = script.title || '';
             document.getElementById('workGenre').value = script.genre || '';
@@ -890,7 +1204,7 @@ window.deleteWork = async function(scriptId) {
     if (!confirm('Are you sure you want to remove this project from your portfolio?')) return;
     
     try {
-        const json = await API.scripts.delete(scriptId);
+        const json = await API.portfolio.delete(scriptId);
         
         if (json.success) {
             notifyProfile('Project removed');
@@ -932,8 +1246,8 @@ async function handleWorkSubmit(e) {
         return;
     }
 
-    if (typeof API === 'undefined' || !API.scripts) {
-        notifyProfile('Project API is not available. Start the API server and try again.');
+    if (typeof API === 'undefined' || !API.portfolio) {
+        notifyProfile('Portfolio API is not available.');
         return;
     }
 
@@ -944,8 +1258,8 @@ async function handleWorkSubmit(e) {
 
     try {
         const json = scriptId
-            ? await API.scripts.update(scriptId, data)
-            : await API.scripts.createPortfolio(data);
+            ? await API.portfolio.update(scriptId, data)
+            : await API.portfolio.create(data);
         
         if (json.success) {
             const savedScript = json.data || {

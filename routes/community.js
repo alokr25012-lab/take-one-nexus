@@ -8,7 +8,9 @@ const fs = require('fs');
 const path = require('path');
 const { captureError } = require('../src/lib/sentry');
 const { uploadLogo } = require('../middleware/upload');
-const { createRateLimiter } = require('../middleware/rateLimiter');
+const { createRateLimiter, communityLimiter } = require('../middleware/rateLimiter');
+const { isValidSecureUrl } = require('../utils/security/urlValidator');
+
 
 const inviteLimiter = createRateLimiter({
   limit: 20,
@@ -343,7 +345,21 @@ router.post('/verify-payment', authenticateUser, verifyPaymentValidation, async 
     if (!isBypass) {
       // Verify payment amount in paise from Razorpay directly to prevent replay attacks
       try {
-        const payRes = await fetch(`https://api.razorpay.com/v1/payments/${razorpay_payment_id}`, {
+        // Validate payment ID format to prevent SSRF path manipulation / directory traversal
+        if (!razorpay_payment_id || !/^pay_[a-zA-Z0-9]+$/.test(razorpay_payment_id)) {
+          console.warn(`[Community] Blocked potentially malicious payment ID input: ${razorpay_payment_id}`);
+          return res.status(400).json({ success: false, message: 'Invalid payment identifier format' });
+        }
+
+        const targetUrl = `https://api.razorpay.com/v1/payments/${razorpay_payment_id}`;
+        
+        // Assert URL safety
+        if (!isValidSecureUrl(targetUrl)) {
+          console.warn(`[Community] Blocked unsafe outbound SSRF URL request: ${targetUrl}`);
+          return res.status(400).json({ success: false, message: 'Forbidden request destination' });
+        }
+
+        const payRes = await fetch(targetUrl, {
           headers: {
             'Authorization': 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64')
           }
@@ -412,7 +428,7 @@ const instantiateValidation = [
   validateRequest
 ];
 
-router.post('/instantiate', authenticateUser, instantiateValidation, async (req, res) => {
+router.post('/instantiate', authenticateUser, communityLimiter, instantiateValidation, async (req, res) => {
   try {
     const userId = Number(req.user.id);
     const { razorpay_order_id, name, description } = req.body;
@@ -634,7 +650,7 @@ const inviteMemberValidation = [
   validateRequest
 ];
 
-router.post('/members/invite', authenticateUser, inviteLimiter, inviteMemberValidation, async (req, res) => {
+router.post('/members/invite', authenticateUser, communityLimiter, inviteLimiter, inviteMemberValidation, async (req, res) => {
   try {
     const callerId = Number(req.user.id);
     const userId = req.body.userId ? Number(req.body.userId) : null;

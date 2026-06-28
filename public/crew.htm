@@ -3,11 +3,11 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>Find Your Crew | Take One Nexus</title>
-  <meta name="description" content="Browse directors, camera crew, actors, editors, sound, lights, and set support in one clean workspace." />
+  <title>Find Film Crew, Actors & Directors | Take One Nexus</title>
+  <meta name="description" content="Search, filter, and connect with directors, camera crew, actors, editors, and set support on Take One Nexus. Connect with verified student and professional filmmakers." />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta property="og:title" content="Find Your Crew | Take One Nexus" />
-  <meta property="og:description" content="Browse directors, camera crew, actors, editors, sound, lights, and set support in one clean workspace." />
+  <meta property="og:title" content="Find Film Crew, Actors & Directors | Take One Nexus" />
+  <meta property="og:description" content="Browse, search, and connect with verified filmmakers, actors, crew operatives, and creative support in one clean workspace." />
   <meta property="og:type" content="website" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,6 +15,7 @@
     href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,300;1,300;1,400&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="/styles/pages/crew.css">
+  <link rel="stylesheet" href="/styles/components/auth-modal.css">
   <link rel="stylesheet" href="/styles/components/global-chat-fab.css">
 </head>
 
@@ -101,15 +102,227 @@
     </section>
   </main>
 
+  <!-- Modal Markup & Toast -->
+  <div id="toast">Script submitted ✦</div>
+
+  <div id="loginModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">LOGIN</h2>
+        <button class="modal-close" id="closeLoginBtn">&times;</button>
+      </div>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="loginEmail">Email Address</label>
+          <input type="email" id="loginEmail" placeholder="your@email.com" required>
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <div class="pw-wrap">
+            <input type="password" id="loginPassword" placeholder="Your password" required>
+            <button type="button" class="pw-toggle" aria-label="Show password" tabindex="0">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div style="text-align: right; margin-top: 6px;">
+            <button type="button" id="forgotPasswordLink" class="forgot-password-link">Forgot Password?</button>
+          </div>
+        </div>
+        <button type="submit" class="form-submit">Sign In →</button>
+      </form>
+      <div class="form-footer">
+        Don't have an account? <a id="registerLink">Create one</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="forgotPasswordModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">RESET PASSWORD</h2>
+        <button class="modal-close" id="closeForgotPasswordBtn">&times;</button>
+      </div>
+      <div style="font-size: 10px; letter-spacing: 0.15em; color: var(--silver); margin-bottom: 20px; line-height: 1.7;">
+        Enter your registered email. If it exists in the Nexus, a secure reset link will be transmitted to your inbox.
+      </div>
+      <form id="forgotPasswordForm">
+        <div class="form-group">
+          <label for="forgotEmail">Email Address</label>
+          <input type="email" id="forgotEmail" placeholder="your@email.com" required>
+        </div>
+        <div id="forgotPasswordMsg" style="display: none; padding: 10px 14px; font-size: 11px; letter-spacing: 0.08em; margin-bottom: 14px; border-radius: 2px;"></div>
+        <button type="submit" class="form-submit" id="forgotPasswordSubmitBtn">Send Reset Link →</button>
+      </form>
+      <div class="form-footer">
+        Remember your password? <a id="backToLoginFromForgot">Sign in</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="registerModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">CREATE ACCOUNT</h2>
+        <button class="modal-close" id="closeRegisterBtn">&times;</button>
+      </div>
+      <form id="registerForm" autocomplete="off">
+        <div class="wizard-progress-bar">
+          <div class="progress-step active" data-step="1"><span>01</span> Account</div>
+          <div class="progress-step" data-step="2"><span>02</span> Role</div>
+          <div class="progress-step" data-step="3"><span>03</span> Details</div>
+        </div>
+
+        <!-- STEP 1: ACCOUNT DETAILS -->
+        <div class="wizard-step active" data-step="1">
+          <div class="form-group">
+            <label for="registerName">Full Name</label>
+            <input type="text" id="registerName" placeholder="Arjun Mehta" required>
+          </div>
+          <div class="form-group">
+            <label for="registerEmail">Email Address</label>
+            <input type="email" id="registerEmail" placeholder="your@email.com" required>
+          </div>
+          <div class="form-group">
+            <label for="registerPassword">Password</label>
+            <div class="pw-wrap">
+              <input type="password" id="registerPassword" placeholder="Create a strong password" autocomplete="new-password" required>
+              <button type="button" class="pw-toggle" aria-label="Show password" tabindex="0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+            <div id="passwordStrength" class="password-strength" style="display: none;">
+              <div class="strength-label">Password Strength</div>
+              <div class="strength-bar">
+                <div id="strengthFill" class="strength-fill"></div>
+              </div>
+              <div id="strengthText" class="strength-text"></div>
+              <ul class="strength-checklist">
+                <li id="ruleLength">✗8+ characters</li>
+                <li id="ruleUpper">✗Uppercase letter</li>
+                <li id="ruleNumber">✗Number</li>
+                <li id="ruleSpecial">✗Special character</li>
+              </ul>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="registerConfirmPassword">Confirm Password</label>
+            <div class="pw-wrap">
+              <input type="password" id="registerConfirmPassword" placeholder="Re-enter password" autocomplete="new-password" required>
+              <button type="button" class="pw-toggle" aria-label="Show password" tabindex="0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="wizard-nav-buttons">
+            <button type="button" class="wizard-btn-next" id="registerNext1" style="flex-grow: 1;">Next Phase →</button>
+          </div>
+        </div>
+
+        <!-- STEP 2: PATHWAY & ROLE SELECTION -->
+        <div class="wizard-step" data-step="2">
+          <div class="form-group">
+            <label>Choose Your Pathway</label>
+            <div class="pathway-cards-container">
+              <div class="pathway-card" id="pathwayCreator" data-pathway="creator">
+                <div class="pathway-icon">🎬</div>
+                <div class="pathway-title">Creator</div>
+                <p class="pathway-desc">Directors, writers, producers showing off a script & forming crew teams.</p>
+              </div>
+              <div class="pathway-card" id="pathwayCrew" data-pathway="crew">
+                <div class="pathway-icon">🎥</div>
+                <div class="pathway-title">Crew operative</div>
+                <p class="pathway-desc">DPs, editors, actors, sound designers looking to join dynamic sets.</p>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="registerRole">Your Core Specialty</label>
+            <select id="registerRole">
+              <option value="" selected disabled>Select Role</option>
+              <option value="Director">Director</option>
+              <option value="Photographer">Photographer</option>
+              <option value="Cinematographer / DP">Cinematographer / DP</option>
+              <option value="Writer">Writer</option>
+              <option value="Editor">Editor</option>
+              <option value="Sound Designer">Sound Designer</option>
+              <option value="Designer">Designer</option>
+              <option value="Actor">Actor</option>
+              <option value="Producer">Producer</option>
+              <option value="Lighting Crew">Lighting Crew</option>
+              <option value="Set Support">Set Support</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="registerScreenName">Screen Name / Stage Name (Optional)</label>
+            <input type="text" id="registerScreenName" placeholder="e.g., RK Visuals, AR Motion Lab">
+          </div>
+          <div class="form-group">
+            <label for="registerDisplayPreference">Display Preference</label>
+            <select id="registerDisplayPreference">
+              <option value="" selected disabled>Select Display Preference</option>
+              <option value="Show Real Name Only">Show Real Name Only</option>
+              <option value="Show Screen Name Only">Show Screen Name Only</option>
+              <option value="Show Both">Show Both (Name • Screen Name)</option>
+            </select>
+          </div>
+          <div class="wizard-nav-buttons">
+            <button type="button" class="wizard-btn-prev" id="registerBack1">← Back</button>
+            <button type="button" class="wizard-btn-next" id="registerNext2">Next Phase →</button>
+          </div>
+        </div>
+
+        <!-- STEP 3: DEMOGRAPHICS & LOCATION -->
+        <div class="wizard-step" data-step="3">
+          <div class="form-group">
+            <label for="registerGender">Gender</label>
+            <select id="registerGender" class="profile-role-dropdown">
+              <option value="" selected disabled>Choose Gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+              <option value="Prefer not to say">Prefer not to say</option>
+            </select>
+          </div>
+          <div class="form-group" style="position: relative;">
+            <label for="registerCollege">College / University</label>
+            <input type="text" id="registerCollege" placeholder="e.g., FTII Pune" autocomplete="off">
+            <div id="collegeSuggestions" class="autocomplete-dropdown"></div>
+          </div>
+          <div class="form-group" style="position: relative;">
+            <label for="registerCity">City</label>
+            <input type="text" id="registerCity" placeholder="e.g., Mumbai" autocomplete="off">
+            <div id="citySuggestions" class="autocomplete-dropdown"></div>
+          </div>
+          <div class="wizard-nav-buttons">
+            <button type="button" class="wizard-btn-prev" id="registerBack2">← Back</button>
+            <button type="submit" class="wizard-btn-next" style="flex-grow: 1;">Create Account →</button>
+          </div>
+        </div>
+      </form>
+      <div class="form-footer">
+        Already have an account? <a id="backToLoginLink">Sign in</a>
+      </div>
+    </div>
+  </div>
+
   <script src="/scripts/constants/roles.js" defer></script>
+  <script src="/scripts/constants/themes.js" defer></script>
   <script src="/scripts/api/api.js" defer></script>
   <script src="/scripts/utils/helpers.js" defer></script>
+  <script src="/scripts/utils/locations.js" defer></script>
+  <script src="/scripts/utils/colleges.js" defer></script>
   <script src="/scripts/components/ui.js" defer></script>
+  <script src="/scripts/components/modal.js" defer></script>
   <script src="/scripts/components/navbar.js" defer></script>
   <script src="/scripts/animations/common.js" defer></script>
   <script src="/scripts/utils/user.js" defer></script>
+  <script src="/scripts/components/auth-modal.js" defer></script>
+  <script src="/scripts/components/register-wizard.js" defer></script>
+  <script src="/scripts/components/email-verification-reminder-popup.js" defer></script>
   <script src="/scripts/pages/crew.js" defer></script>
   <script src="/scripts/components/global-chat-fab.js" defer></script>
+
 </body>
 
 </html>

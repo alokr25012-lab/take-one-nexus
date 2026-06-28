@@ -230,8 +230,9 @@ router.post('/confirm', authenticateUser, otpConfirmLimiter, async (req, res) =>
       console.error('[OTP] Failed to update cookie after verification:', cookieErr.message);
     }
 
-    // Trigger credit reward for 'verify_email' task (non-blocking)
-    triggerCreditTask(userId, 'verify_email').catch(err =>
+    // Trigger credit reward for 'EMAIL_VERIFICATION' task (non-blocking)
+    const { awardCreditTask } = require('../utils/seedCreditTasks');
+    awardCreditTask(userId, 'EMAIL_VERIFICATION').catch(err =>
       console.error('[OTP_CREDIT_TRIGGER_ERROR]', err.message)
     );
 
@@ -243,52 +244,4 @@ router.post('/confirm', authenticateUser, otpConfirmLimiter, async (req, res) =>
   }
 });
 
-/**
- * Award credits for a named credit task trigger (e.g. 'verify_email').
- * Idempotent — only awards once per user per task.
- */
-async function triggerCreditTask(userId, triggerType) {
-  try {
-    const task = await prisma.creditTask.findFirst({
-      where: { trigger_type: triggerType, is_active: true }
-    });
-
-    if (!task) return; // Task not configured
-
-    // Idempotency check — don't double-award
-    const existing = await prisma.userCompletedTask.findFirst({
-      where: { user_id: userId, task_id: task.id }
-    });
-    if (existing) return;
-
-    // Award credits atomically
-    await prisma.$transaction([
-      prisma.userCompletedTask.create({
-        data: {
-          user_id: userId,
-          task_id: task.id,
-          credits_awarded: task.credits_rewarded,
-        }
-      }),
-      prisma.user.update({
-        where: { id: userId },
-        data: { credits: { increment: task.credits_rewarded } }
-      }),
-      prisma.creditTransaction.create({
-        data: {
-          user_id: userId,
-          amount: task.credits_rewarded,
-          type: 'CREDIT',
-          reason: `Task reward: ${task.name}`,
-        }
-      })
-    ]);
-
-    console.log(`[CREDITS] +${task.credits_rewarded} awarded to user ${userId} for '${triggerType}'`);
-  } catch (err) {
-    console.error('[CREDIT_TASK_ERROR]', err.message);
-  }
-}
-
 module.exports = router;
-module.exports.triggerCreditTask = triggerCreditTask;

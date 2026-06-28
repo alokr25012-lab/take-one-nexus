@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const prisma = require('../utils/prisma');
 const { Resend } = require('resend');
-const { createRateLimiter } = require('../middleware/rateLimiter');
+const { createRateLimiter, authLimiter } = require('../middleware/rateLimiter');
 const { captureError } = require('../src/lib/sentry');
 
 const router = express.Router();
@@ -154,7 +154,7 @@ function buildResetPasswordTemplate({ userName, resetUrl, expiresInMinutes }) {
  * POST /api/auth/forgot-password
  * Generates a password reset token and sends reset email.
  */
-router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
+router.post('/forgot-password', authLimiter, forgotPasswordLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     const normalizedEmail = email?.trim().toLowerCase();
@@ -249,7 +249,7 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
  * POST /api/auth/reset-password
  * Resets user password using valid token
  */
-router.post('/reset-password', resetPasswordLimiter, async (req, res) => {
+router.post('/reset-password', authLimiter, resetPasswordLimiter, async (req, res) => {
   try {
     const { token, password } = req.body;
 

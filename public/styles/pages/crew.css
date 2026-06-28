@@ -89,8 +89,8 @@ header:hover {
 nav {
   display: flex;
   align-items: center;
-  gap: 28px;
-  flex-wrap: wrap;
+  gap: clamp(12px, 1.8vw, 24px);
+  flex-wrap: nowrap;
 }
 
 nav a {
@@ -100,6 +100,7 @@ nav a {
   letter-spacing: 0.3em;
   text-transform: uppercase;
   transition: color 0.25s;
+  white-space: nowrap;
 }
 
 nav a:hover,
@@ -121,6 +122,7 @@ nav a.active {
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   box-shadow: 0 0 15px rgba(255, 77, 26, 0.4);
+  white-space: nowrap;
 }
 .nav-cta:hover { 
   background: var(--amber); 
@@ -500,7 +502,7 @@ header.nav-open .nav-toggle span:nth-child(3) { transform: translateY(-6.5px) ro
   to   { opacity: 1; transform: translateY(0); }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .nav-toggle { display: flex; }
 
   header {
@@ -610,3 +612,17 @@ header.nav-open .nav-toggle span:nth-child(3) { transform: translateY(-6.5px) ro
   color: var(--silver);
   text-transform: uppercase;
 }
+
+/* Photographer role theme variables override */
+.role-theme-photographer {
+  --neon: #8B5CF6;
+  --neon2: #A78BFA;
+  --border: rgba(139, 92, 246, 0.18);
+  --glow: rgba(139, 92, 246, 0.25);
+  --theme-primary: #8B5CF6;
+  --theme-primary-rgb: 139, 92, 246;
+  --theme-secondary: #7C3AED;
+  --theme-secondary-rgb: 124, 58, 237;
+  --theme-glow: rgba(139, 92, 246, 0.15);
+}
+
