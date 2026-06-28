@@ -859,38 +859,7 @@ router.put('/:id', authenticateUser, requireSameUser, profileUpdateLimiter, asyn
   }
 });
 
-router.get('/:id', authenticateUser, requireSameUser, async (req, res) => {
-  try {
-    const userId = Number(req.params.id);
 
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid user id is required'
-      });
-    }
-
-    const profile = await getProfileData(userId);
-
-    if (!profile) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: profile
-    });
-  } catch (error) {
-    console.error('Profile fetch error:', error.message);
-    res.status(500).json({
-      success: false,
-      message: 'Could not load profile'
-    });
-  }
-});
 
 
 
@@ -1193,7 +1162,6 @@ router.get('/recommendations', authenticateUser, recommendationsLimiter, async (
   try {
     const userId = Number(req.user.id);
     const userRole = String(req.user.role || '').toLowerCase();
-    const userSkills = String(req.user.skills || '').toLowerCase();
 
     // 1. Recommended scripts — match user role against roles_needed
     const scriptRows = await safeQuery(
@@ -1240,6 +1208,39 @@ router.get('/recommendations', authenticateUser, recommendationsLimiter, async (
   } catch (error) {
     console.error('Recommendations error:', error.message);
     res.status(500).json({ success: false, message: 'Could not load recommendations' });
+  }
+});
+
+router.get('/:id', authenticateUser, requireSameUser, async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid user id is required'
+      });
+    }
+
+    const profile = await getProfileData(userId);
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: profile
+    });
+  } catch (error) {
+    console.error('Profile fetch error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Could not load profile'
+    });
   }
 });
 

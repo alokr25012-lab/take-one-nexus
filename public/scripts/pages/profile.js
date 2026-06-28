@@ -29,7 +29,7 @@ function switchTab(name, btn) {
 
 function activateHashTab() {
     const requestedTab = window.location.hash.replace('#', '');
-    const allowedTabs = ['projects', 'about', 'collab', 'notifications'];
+    const allowedTabs = ['projects', 'about', 'collab', 'notifications', 'recommendations', 'analytics', 'portfolio'];
 
     if (allowedTabs.includes(requestedTab)) {
         switchTab(requestedTab);

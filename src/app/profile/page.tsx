@@ -305,7 +305,7 @@ export default async function ProfilePage({
                 }}>
                   <div style={{ fontSize: '9px', letterSpacing: '3px', color: 'var(--neon)', textTransform: 'uppercase', marginBottom: '6px' }}>⚠ Unverified</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '12px', lineHeight: '1.5' }}>
-                    Verify your email to unlock verified badge and earn 50 credits.
+                    Verify your email to unlock verified badge and earn 150 credits.
                   </div>
                   <button
                     id="verifyEmailBtn"
