@@ -45,6 +45,12 @@ const authenticatedApiLimiter = createRateLimiter({
   keyPrefix: 'auth-api',
 });
 
+const recommendationsLimiter = createRateLimiter({
+  limit: 30, // 30 recommendations requests per 15 minutes
+  windowMs: 15 * 60 * 1000,
+  keyPrefix: 'recommendations',
+});
+
 const profileUpdateLimiter = createRateLimiter({
   limit: 30, // 30 profile updates per 15 minutes
   windowMs: 15 * 60 * 1000,
@@ -1112,7 +1118,7 @@ router.get('/analytics/summary', authenticateUser, authenticatedApiLimiter, asyn
  * GET /api/users/recommendations
  * Rule-based personalised recommendations using role, skills, and activity.
  */
-router.get('/recommendations', authenticateUser, authenticatedApiLimiter, async (req, res) => {
+router.get('/recommendations', authenticateUser, recommendationsLimiter, async (req, res) => {
   try {
     const userId = Number(req.user.id);
     const userRole = String(req.user.role || '').toLowerCase();
