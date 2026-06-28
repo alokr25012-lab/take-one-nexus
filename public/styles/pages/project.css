@@ -79,15 +79,21 @@ body::after {
   background: var(--neon);
   border-radius: 50%;
   position: fixed; pointer-events: none; z-index: 10001;
-  transform: translate(-50%, -50%);
+  left: 0; top: 0;
+  opacity: 0;
+  transform: translate3d(0, 0, 0) translate(-50%, -50%);
   box-shadow: 0 0 8px var(--neon), 0 0 16px var(--neon);
   transition: opacity 0.2s ease;
+  will-change: transform, opacity;
 }
 .cur-cross {
   width: 28px; height: 28px;
   position: fixed; pointer-events: none; z-index: 10001;
-  transform: translate(-50%, -50%);
-  transition: all 0.1s ease-out, opacity 0.2s ease;
+  left: 0; top: 0;
+  opacity: 0;
+  transform: translate3d(0, 0, 0) translate(-50%, -50%);
+  transition: opacity 0.2s ease;
+  will-change: transform, opacity;
 }
 .cur-cross::before,
 .cur-cross::after {
@@ -3513,4 +3519,4 @@ footer {
 }
 .strength-bar {
   flex:1;
-}  
+}
