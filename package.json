@@ -45,6 +45,8 @@
     "mysql2": "^3.11.5",
     "next": "^16.2.4",
     "nodemailer": "^6.10.1",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "posthog-js": "^1.373.5",
     "prisma": "^5.22.0",
     "pusher": "^5.3.3",
