@@ -1,0 +1,74 @@
+.takeone-scroll-top {
+  position: fixed;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: max(90px, calc(env(safe-area-inset-bottom) + 82px));
+  z-index: 9996;
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(6, 8, 10, 0.85);
+  backdrop-filter: blur(6px);
+  color: #e8dfc8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transform: translate3d(0, 10px, 0) scale(0.96);
+  pointer-events: none;
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
+.takeone-scroll-top.is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  pointer-events: auto;
+}
+
+.takeone-scroll-top:hover,
+.takeone-scroll-top:focus-visible {
+  border-color: rgba(255, 77, 26, 0.5);
+  box-shadow: 0 8px 28px rgba(255, 77, 26, 0.22);
+  outline: none;
+}
+
+.takeone-scroll-top svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: rotate(-90deg);
+}
+
+.takeone-scroll-top .ring-track {
+  stroke: rgba(255, 255, 255, 0.14);
+}
+
+.takeone-scroll-top .ring-progress {
+  stroke: rgba(255, 77, 26, 0.85);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.1s linear;
+}
+
+.takeone-scroll-top .scroll-arrow {
+  position: relative;
+  z-index: 1;
+  font-size: 16px;
+  font-family: 'Space Mono', monospace;
+}
+
+@media (max-width: 768px) {
+  .takeone-scroll-top {
+    right: max(14px, env(safe-area-inset-right));
+    bottom: max(78px, calc(env(safe-area-inset-bottom) + 70px));
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+  }
+}
