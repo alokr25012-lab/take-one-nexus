@@ -6,6 +6,7 @@ import { getAvatarUrl } from '@/lib/avatars';
 import { format } from 'date-fns';
 import NewDirectMessageModal from '@/components/NewDirectMessageModal';
 import TaskModal from '@/components/TaskModal';
+import AvatarUploader from '@/components/AvatarUploader';
 import { fetchWithCSRF } from '@/utils/fetchWithCSRF';
 import './chat.css';
 
@@ -3878,55 +3879,20 @@ export default function ChatPage() {
               {inCommunity && communityData ? (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '12px' }}>
-                    {communityData.logo_url ? (
-                      <img src={cacheBustUrl(communityData.logo_url, communityData.updated_at)} alt="Logo" style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
-                    ) : (
-                      <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: 'rgba(255,77,26,0.1)', border: '1px solid var(--neon)', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', fontSize: '18px', color: 'var(--neon)' }}>
-                        {communityData.name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div style={{ flex: 1, overflow: 'hidden' }}>
-                      <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', color: 'var(--neon)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{communityData.name}</h3>
-                      {['Owner', 'Moderator'].includes(communityRole || '') && (
-                        <label style={{ fontSize: '10px', color: '#aaa', cursor: 'pointer', textDecoration: 'underline' }}>
-                          Update Logo
-                          <input 
-                            type="file" 
-                            accept="image/jpeg,image/png,image/webp" 
-                            style={{ display: 'none' }} 
-                            onChange={async (e) => {
-                              if (e.target.files && e.target.files[0]) {
-                                const file = e.target.files[0];
-                                if (file.size > 5 * 1024 * 1024) {
-                                  alert('File is too large. Max size is 5MB.');
-                                  return;
-                                }
-                                const formData = new FormData();
-                                formData.append('logo', file);
-                                formData.append('communityId', String(communityData.id));
-                                const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
-                                try {
-                                  const res = await fetch('/api/community/logo', {
-                                    method: 'POST',
-                                    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-                                    body: formData
-                                  });
-                                  const json = await res.json();
-                                  if (json.success) {
-                                    alert('Logo updated successfully.');
-                                    await fetchMyCommunity();
-                                  } else {
-                                    alert(json.message || 'Failed to upload logo.');
-                                  }
-                                } catch (err) {
-                                  console.error('Error uploading logo:', err);
-                                  alert('Failed to upload logo.');
-                                }
-                              }
-                            }}
-                          />
-                        </label>
-                      )}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: '4px' }}>
+                      <AvatarUploader
+                        type="community"
+                        targetId={communityData.id}
+                        currentUrl={communityData.logo_url}
+                        isAdmin={['Owner', 'Moderator'].includes(communityRole || '')}
+                        size={64}
+                        shape="rounded"
+                        onSuccess={async (newUrl) => {
+                          await fetchMyCommunity();
+                          // Update myCommunities list state as well
+                          setMyCommunities(prev => prev.map(c => c.id === communityData.id ? { ...c, logo_url: newUrl } : c));
+                        }}
+                      />
                     </div>
                   </div>
 
@@ -5084,68 +5050,19 @@ export default function ChatPage() {
                       {!activeConv.is_group && <span className="details-role">{activeRecipient?.role || 'Crew Member'}</span>}
                       
                       {activeConv.is_group && (
-                        <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', alignItems: 'flex-start' }}>
-                          <label style={{ fontSize: '11px', color: 'rgba(232,232,224,0.4)', textTransform: 'uppercase', letterSpacing: '1px' }}>Group Avatar URL</label>
-                          <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
-                            <input 
-                              type="text" 
-                              placeholder="https://example.com/avatar.png"
-                              defaultValue={activeConv.avatar_url || ''}
-                              id="group-avatar-input"
-                              style={{
-                                flex: 1,
-                                background: 'rgba(0,0,0,0.3)',
-                                border: '1px solid rgba(232,232,224,0.1)',
-                                borderRadius: '4px',
-                                padding: '6px 8px',
-                                fontSize: '12px',
-                                color: '#e8e8e0',
-                                outline: 'none'
-                              }}
-                            />
-                            <button 
-                              onClick={async () => {
-                                const input = document.getElementById('group-avatar-input') as HTMLInputElement;
-                                if (!input) return;
-                                const newUrl = input.value.trim();
-                                
-                                try {
-                                  const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
-                                  const res = await fetchWithCSRF(`/api/chat/conversations/${activeConv.id}/avatar`, {
-                                    method: 'PATCH',
-                                    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-                                    body: JSON.stringify({ avatarUrl: newUrl })
-                                  });
-                                  const data = await res.json();
-                                  if (data.success) {
-                                    // Update state
-                                    setActiveConv(prev => prev ? { ...prev, avatar_url: newUrl } : null);
-                                    setConversations(prev => prev.map(c => c.id === activeConv.id ? { ...c, avatar_url: newUrl } : c));
-                                    alert('Group avatar updated successfully!');
-                                  } else {
-                                    alert(data.message || 'Failed to update group avatar');
-                                  }
-                                } catch (err) {
-                                  console.error('Avatar update failed:', err);
-                                  alert('Failed to update group avatar');
-                                }
-                              }}
-                              style={{
-                                background: 'var(--neon)',
-                                color: '#000',
-                                border: 'none',
-                                borderRadius: '4px',
-                                padding: '6px 12px',
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                cursor: 'pointer',
-                                transition: 'all 0.3s ease'
-                              }}
-                            >
-                              Save
-                            </button>
-                          </div>
-                          {/* We removed the old Messaging Permissions block here because it is now inside the Settings Tab */}
+                        <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', alignItems: 'center' }}>
+                          <AvatarUploader
+                            type="group"
+                            targetId={activeConv.id}
+                            currentUrl={activeConv.avatar_url}
+                            isAdmin={activeConv.my_role === 'Admin' || activeConv.my_role === 'Director' || ['Owner', 'Moderator'].includes(communityRole || '')}
+                            size={72}
+                            shape="rounded"
+                            onSuccess={(newUrl) => {
+                              setActiveConv(prev => prev ? { ...prev, avatar_url: newUrl || undefined } : null);
+                              setConversations(prev => prev.map(c => c.id === activeConv.id ? { ...c, avatar_url: newUrl || undefined } : c));
+                            }}
+                          />
                         </div>
                       )}
                     </div>

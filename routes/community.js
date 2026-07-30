@@ -1289,7 +1289,9 @@ router.post('/invitations/:id/reject', authenticateUser, async (req, res) => {
 
 /**
  * POST /api/community/logo
- * Local file logo upload
+ * Upload a community avatar image to Supabase Storage.
+ * Accepts multipart/form-data with a single 'logo' field.
+ * Only Owner or Moderator members are permitted.
  */
 router.post('/logo', authenticateUser, (req, res) => {
   uploadLogo.single('logo')(req, res, async (err) => {
@@ -1325,11 +1327,16 @@ router.post('/logo', authenticateUser, (req, res) => {
         return res.status(403).json({ success: false, message: 'Access denied: Community Management permissions required' });
       }
 
-      const ext = path.extname(req.file.originalname) || '.jpg';
-      const fileName = `community-logo-${communityId}-${Date.now()}${ext}`;
+      // Derive extension from validated MIME type only (never from user-supplied filename)
+      const mimeToExt = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
+      const ext = mimeToExt[req.file.mimetype] || '.jpg';
+
+      // Deterministic, upsert-safe path — re-uploading the same community always overwrites
+      // the previous file rather than accumulating orphaned objects in the bucket.
+      const fileName = `${communityId}/avatar${ext}`;
 
       // Upload using Supabase (with local fallback)
-      const logoUrl = await uploadToStorage(req.file.buffer, 'communities', fileName, req.file.mimetype);
+      const logoUrl = await uploadToStorage(req.file.buffer, 'community-avatars', fileName, req.file.mimetype);
 
       await prisma.community.update({
         where: { id: communityId },
@@ -1349,6 +1356,47 @@ router.post('/logo', authenticateUser, (req, res) => {
       res.status(500).json({ success: false, message: 'Internal server error' });
     }
   });
+});
+
+/**
+ * DELETE /api/community/avatar
+ * Remove the community avatar and reset to null (shows initials fallback).
+ * Only Owner or Moderator members are permitted.
+ * Expects body: { communityId: number }
+ */
+router.delete('/avatar', authenticateUser, [
+  body('communityId').isNumeric().withMessage('communityId must be a number'),
+  validateRequest
+], async (req, res) => {
+  try {
+    const communityId = Number(req.body.communityId);
+    const userId = Number(req.user.id);
+
+    // Verify caller is Owner or Moderator
+    const membership = await prisma.communityMember.findFirst({
+      where: {
+        user_id: userId,
+        community_id: communityId,
+        role: { in: ['Owner', 'Moderator'] }
+      }
+    });
+
+    if (!membership) {
+      return res.status(403).json({ success: false, message: 'Access denied: Community Management permissions required' });
+    }
+
+    await prisma.community.update({
+      where: { id: communityId },
+      data: { avatar_url: null }
+    });
+
+    logCommunityEvent('logo_removed', { communityId, userId });
+
+    res.json({ success: true, message: 'Community avatar removed.' });
+  } catch (error) {
+    console.error('[Community] Avatar remove error:', error.message);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
 });
 
 /**

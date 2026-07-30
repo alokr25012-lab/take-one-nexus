@@ -6,6 +6,9 @@ const prisma = require('../utils/prisma');
 const Pusher = require('pusher');
 const { formatDisplayName } = require('../utils/formatting');
 const rateLimit = require('express-rate-limit');
+const multer = require('multer');
+const path = require('path');
+const { uploadToStorage } = require('../utils/supabase');
 
 
 const router = express.Router();
@@ -17,6 +20,30 @@ const pusherAuthLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests. Please wait before trying again.' }
+});
+
+// Rate limiter for group avatar upload endpoint (5 uploads/min per user)
+const avatarUploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  keyGenerator: (req) => `avatar-upload-${req.user?.id || req.ip}`,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many avatar upload attempts. Please wait a moment.' }
+});
+
+// Multer for group avatar uploads – memory storage, MIME allow-list, 5 MB cap
+const groupAvatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPG, PNG, and WEBP images are allowed.'), false);
+    }
+  }
 });
 
 // Configure Pusher
@@ -711,51 +738,141 @@ router.post('/conversations/:id/clear', authenticateUser, [
 
 
 /**
- * PATCH /api/chat/conversations/:id/avatar
- * Update group conversation avatar
+ * POST /api/chat/conversations/:id/avatar
+ * Upload a group conversation avatar image to Supabase Storage.
+ * Accepts multipart/form-data with a single field named 'avatar'.
+ * Only Admin or Director members are permitted.
  */
-router.patch('/conversations/:id/avatar', authenticateUser, [
+router.post('/conversations/:id/avatar', authenticateUser, avatarUploadLimiter, (req, res) => {
+  groupAvatarUpload.single('avatar')(req, res, async (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ success: false, message: 'File too large. Maximum size is 5 MB.' });
+      }
+      return res.status(400).json({ success: false, message: err.message });
+    }
+
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: 'No file uploaded. Please attach an image.' });
+      }
+
+      if (!req.params.id || isNaN(Number(req.params.id))) {
+        return res.status(400).json({ success: false, message: 'Invalid conversation ID.' });
+      }
+
+      const conversationId = Number(req.params.id);
+      const userId = Number(req.user.id);
+
+      // Verify the conversation exists and the caller is an Admin or Director
+      const membership = await prisma.conversationMember.findFirst({
+        where: {
+          conversation_id: conversationId,
+          user_id: userId,
+          role: { in: ['Admin', 'Director'] }
+        },
+        include: { conversation: { select: { is_group: true } } }
+      });
+
+      if (!membership) {
+        return res.status(403).json({ success: false, message: 'Access denied: Admin or Director role required.' });
+      }
+
+      if (!membership.conversation.is_group) {
+        return res.status(400).json({ success: false, message: 'Can only update group avatars.' });
+      }
+
+      // Derive safe file extension from the validated MIME type (never from user input)
+      const mimeToExt = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
+      const ext = mimeToExt[req.file.mimetype] || '.jpg';
+
+      // Deterministic, upsert-friendly storage path – no user-supplied filename used
+      const storagePath = `group-avatars/${conversationId}/avatar${ext}`;
+
+      const avatarUrl = await uploadToStorage(
+        req.file.buffer,
+        'group-avatars',
+        `${conversationId}/avatar${ext}`,
+        req.file.mimetype
+      );
+
+      // Persist the public URL
+      const updatedConversation = await prisma.conversation.update({
+        where: { id: conversationId },
+        data: { avatar_url: avatarUrl },
+        include: getConversationInclude()
+      });
+
+      const transformed = transformConversation(updatedConversation, userId);
+
+      // Broadcast the update via Pusher so all members see the change in real-time
+      pusher.trigger(`conversation-${conversationId}`, 'avatar-updated', {
+        conversationId,
+        avatar_url: avatarUrl
+      });
+
+      const members = await prisma.conversationMember.findMany({
+        where: { conversation_id: conversationId },
+        select: { user_id: true }
+      });
+
+      for (const member of members) {
+        pusher.trigger(`user-${member.user_id}-chats`, 'conversation-update', transformed);
+      }
+
+      res.json({ success: true, avatar_url: avatarUrl, data: transformed });
+    } catch (error) {
+      console.error('Group avatar upload error:', error.message);
+      res.status(500).json({ success: false, message: 'Could not upload group avatar.' });
+    }
+  });
+});
+
+/**
+ * DELETE /api/chat/conversations/:id/avatar
+ * Remove the group avatar and reset to the default.
+ * Only Admin or Director members are permitted.
+ */
+router.delete('/conversations/:id/avatar', authenticateUser, [
   param('id').isNumeric(),
-  body('avatarUrl').trim().notEmpty().withMessage('avatarUrl is required'),
   validateRequest
 ], async (req, res) => {
   try {
     const conversationId = Number(req.params.id);
     const userId = Number(req.user.id);
-    const { avatarUrl } = req.body;
 
-    // Check if user is part of the conversation
-    const conversation = await prisma.conversation.findFirst({
+    // Verify the caller is an Admin or Director
+    const membership = await prisma.conversationMember.findFirst({
       where: {
-        id: conversationId,
-        members: { some: { user_id: userId } }
-      }
+        conversation_id: conversationId,
+        user_id: userId,
+        role: { in: ['Admin', 'Director'] }
+      },
+      include: { conversation: { select: { is_group: true } } }
     });
 
-    if (!conversation) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
+    if (!membership) {
+      return res.status(403).json({ success: false, message: 'Access denied: Admin or Director role required.' });
     }
 
-    if (!conversation.is_group) {
-      return res.status(400).json({ success: false, message: 'Can only update group avatars' });
+    if (!membership.conversation.is_group) {
+      return res.status(400).json({ success: false, message: 'Can only update group avatars.' });
     }
 
-    // Update conversation avatar
+    // Reset avatar_url to null
     const updatedConversation = await prisma.conversation.update({
       where: { id: conversationId },
-      data: { avatar_url: avatarUrl },
+      data: { avatar_url: null },
       include: getConversationInclude()
     });
 
     const transformed = transformConversation(updatedConversation, userId);
 
-    // Broadcast the update via Pusher
     pusher.trigger(`conversation-${conversationId}`, 'avatar-updated', {
       conversationId,
-      avatar_url: avatarUrl
+      avatar_url: null
     });
 
-    // Also notify all member channels
     const members = await prisma.conversationMember.findMany({
       where: { conversation_id: conversationId },
       select: { user_id: true }
@@ -765,10 +882,10 @@ router.patch('/conversations/:id/avatar', authenticateUser, [
       pusher.trigger(`user-${member.user_id}-chats`, 'conversation-update', transformed);
     }
 
-    res.json({ success: true, data: transformed });
+    res.json({ success: true, message: 'Group avatar removed.' });
   } catch (error) {
-    console.error('Update avatar error:', error.message);
-    res.status(500).json({ success: false, message: 'Could not update group avatar' });
+    console.error('Group avatar remove error:', error.message);
+    res.status(500).json({ success: false, message: 'Could not remove group avatar.' });
   }
 });
 
