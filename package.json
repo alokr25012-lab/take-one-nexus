@@ -41,7 +41,7 @@
     "helmet": "^8.1.0",
     "jose": "^6.2.3",
     "jsonwebtoken": "^9.0.2",
-    "lucide-react": "^1.14.0",
+    "lucide-react": "^1.17.0",
     "multer": "^2.1.1",
     "mysql2": "^3.11.5",
     "next": "^16.2.4",
