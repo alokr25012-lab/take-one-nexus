@@ -1514,7 +1514,7 @@ export default function ChatPage() {
   
 
   // Task states
-  const [activeTab, setActiveTab] = useState<'chat' | 'tasks' | 'project_tracker'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'feed' | 'tasks' | 'project_tracker'>('chat');
   const [activeOrder, setActiveOrder] = useState<any>(null);
   const [negotiatingOffer, setNegotiatingOffer] = useState<any>(null);
   const [isNegotiateModalOpen, setIsNegotiateModalOpen] = useState(false);
@@ -1578,6 +1578,15 @@ export default function ChatPage() {
   const [allCommunitiesLoading, setAllCommunitiesLoading] = useState(false);
   const [myRequests, setMyRequests] = useState<any[]>([]);
   const [isJoinRequestModalOpen, setIsJoinRequestModalOpen] = useState(false);
+
+  // Community Feed / Posts States
+  const [communityPosts, setCommunityPosts] = useState<any[]>([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
+  const [postCaption, setPostCaption] = useState('');
+  const [postFiles, setPostFiles] = useState<FileList | null>(null);
+  const [activeCommentsPostId, setActiveCommentsPostId] = useState<number | null>(null);
+  const [commentText, setCommentText] = useState('');
   const [showAutoInviteModal, setShowAutoInviteModal] = useState(false);
   const [autoInviteToHandle, setAutoInviteToHandle] = useState<any | null>(null);
   const [viewingGalaxyLanding, setViewingGalaxyLanding] = useState(false);
@@ -2183,6 +2192,153 @@ export default function ChatPage() {
       }
     } catch {
       alert('Error deleting group');
+    }
+  };
+
+  const fetchCommunityPosts = useCallback(async () => {
+    if (!communityDataRef.current?.id) return;
+    setPostsLoading(true);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
+      const res = await fetch(`/api/community/${communityDataRef.current.id}/posts`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCommunityPosts(data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching community posts:', err);
+    } finally {
+      setPostsLoading(false);
+    }
+  }, []);
+
+  const handleCreatePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!communityData?.id) return;
+    if (!postFiles || postFiles.length === 0) {
+      alert('Please upload at least one image');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('caption', postCaption);
+    for (let i = 0; i < postFiles.length; i++) {
+      formData.append('images', postFiles[i]);
+    }
+
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
+      const res = await fetch(`/api/community/${communityData.id}/posts`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Post created successfully!');
+        setPostCaption('');
+        setPostFiles(null);
+        setIsCreatePostOpen(false);
+        fetchCommunityPosts();
+      } else {
+        alert(data.message || 'Failed to create post');
+      }
+    } catch (err) {
+      console.error('Error creating post:', err);
+      alert('Error creating post');
+    }
+  };
+
+  const handleLikePost = async (postId: number) => {
+    if (!communityData?.id) return;
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
+      const res = await fetch(`/api/community/${communityData.id}/posts/${postId}/like`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Toggle like locally
+        setCommunityPosts(prev => prev.map(p => {
+          if (p.id === postId) {
+            const hasLiked = p.likes.some((l: any) => l.user_id === user?.id);
+            const nextLikes = hasLiked 
+              ? p.likes.filter((l: any) => l.user_id !== user?.id)
+              : [...p.likes, { user_id: user?.id }];
+            return { ...p, likes: nextLikes };
+          }
+          return p;
+        }));
+      }
+    } catch (err) {
+      console.error('Error liking post:', err);
+    }
+  };
+
+  const handleAddComment = async (e: React.FormEvent, postId: number) => {
+    e.preventDefault();
+    if (!commentText.trim() || !communityData?.id) return;
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
+      const res = await fetch(`/api/community/${communityData.id}/posts/${postId}/comment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ content: commentText })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCommentText('');
+        // Append comment locally
+        setCommunityPosts(prev => prev.map(p => {
+          if (p.id === postId) {
+            return { ...p, comments: [...p.comments, data.data] };
+          }
+          return p;
+        }));
+      }
+    } catch (err) {
+      console.error('Error adding comment:', err);
+    }
+  };
+
+  const handleDeletePost = async (postId: number) => {
+    if (!confirm('Are you sure you want to delete this post?') || !communityData?.id) return;
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
+      const res = await fetch(`/api/community/${communityData.id}/posts/${postId}`, {
+        method: 'DELETE',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCommunityPosts(prev => prev.filter(p => p.id !== postId));
+      }
+    } catch (err) {
+      console.error('Error deleting post:', err);
+    }
+  };
+
+  const handlePinPost = async (postId: number) => {
+    if (!communityData?.id) return;
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('take_one_token') : null;
+      const res = await fetch(`/api/community/${communityData.id}/posts/${postId}/pin`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message);
+        fetchCommunityPosts();
+      }
+    } catch (err) {
+      console.error('Error pinning post:', err);
     }
   };
 
@@ -4307,6 +4463,17 @@ export default function ChatPage() {
                         >
                           Transmission
                         </button>
+                        {inCommunity && (
+                          <button 
+                            className={`chat-tab ${activeTab === 'feed' ? 'active' : ''}`}
+                            onClick={() => {
+                              setActiveTab('feed');
+                              fetchCommunityPosts();
+                            }}
+                          >
+                            Feed
+                          </button>
+                        )}
                         <button 
                           className={`chat-tab ${activeTab === 'tasks' ? 'active' : ''}`}
                           onClick={() => {
@@ -4545,6 +4712,235 @@ export default function ChatPage() {
                       </>
                     )}
                   </>
+                ) : activeTab === 'feed' ? (
+                  <div className="feed-area" style={{ padding: '20px', overflowY: 'auto', height: '100%', display: 'flex', flexDirection: 'column', gap: '20px', backgroundColor: '#0b0c10' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
+                      <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', letterSpacing: '0.05em', color: 'var(--cream)', margin: 0, textTransform: 'uppercase' }}>Community Feed</h2>
+                      {['Owner', 'Admin', 'Moderator'].includes(communityRole || '') && (
+                        <button 
+                          onClick={() => setIsCreatePostOpen(true)}
+                          style={{
+                            background: 'var(--neon)',
+                            border: 'none',
+                            color: '#fff',
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '1px',
+                            boxShadow: '0 0 10px rgba(255, 77, 26, 0.4)'
+                          }}
+                        >
+                          New Post +
+                        </button>
+                      )}
+                    </div>
+
+                    {postsLoading ? (
+                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1, color: 'var(--neon)', fontSize: '14px' }}>
+                        Loading feed transmissions...
+                      </div>
+                    ) : communityPosts.length === 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flex: 1, color: '#888', padding: '40px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>📸</div>
+                        <h3 style={{ color: '#ccc', margin: '0 0 8px 0' }}>No posts yet</h3>
+                        <p style={{ fontSize: '13px', maxWidth: '300px', margin: 0 }}>Admins and moderators can share behind-the-scenes content, announcements, and updates here.</p>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
+                        {communityPosts.map((post) => {
+                          const hasLiked = post.likes.some((l: any) => l.user_id === user?.id);
+                          const mediaList = Array.isArray(post.media_urls) ? post.media_urls : [];
+                          return (
+                            <div 
+                              key={post.id}
+                              style={{
+                                background: '#121212',
+                                border: post.is_pinned ? '1px solid var(--neon)' : '1px solid rgba(255,255,255,0.05)',
+                                borderRadius: '12px',
+                                overflow: 'hidden',
+                                display: 'flex',
+                                flexDirection: 'column'
+                              }}
+                            >
+                              {/* Header */}
+                              <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <img 
+                                    src={getAvatarUrl(post.author.name, 'Other', post.author.avatar_url)} 
+                                    alt="" 
+                                    style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }}
+                                  />
+                                  <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff' }}>
+                                        {post.author.screen_name || post.author.name}
+                                      </span>
+                                      {post.author.role && (
+                                        <span style={{ fontSize: '10px', background: 'rgba(255,255,255,0.08)', padding: '2px 6px', borderRadius: '4px', color: '#aaa' }}>
+                                          {post.author.role}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
+                                      {new Date(post.created_at).toLocaleDateString()} at {new Date(post.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  {post.is_pinned && (
+                                    <span style={{ fontSize: '10px', background: 'rgba(255, 77, 26, 0.1)', color: 'var(--neon)', border: '1px solid var(--neon)', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                      📌 Pinned
+                                    </span>
+                                  )}
+                                  {['Owner', 'Admin', 'Moderator'].includes(communityRole || '') && (
+                                    <button 
+                                      onClick={() => handlePinPost(post.id)}
+                                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#888', fontSize: '14px', padding: '4px' }}
+                                      title={post.is_pinned ? 'Unpin post' : 'Pin post'}
+                                    >
+                                      📌
+                                    </button>
+                                  )}
+                                  {(post.author_id === user?.id || ['Owner', 'Admin', 'Moderator'].includes(communityRole || '')) && (
+                                    <button 
+                                      onClick={() => handleDeletePost(post.id)}
+                                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ff4d4d', fontSize: '14px', padding: '4px' }}
+                                      title="Delete post"
+                                    >
+                                      🗑️
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Media Slider/Image */}
+                              {mediaList.length > 0 && (
+                                <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', background: '#000' }}>
+                                  <img 
+                                    src={mediaList[0]} 
+                                    alt="Post Content" 
+                                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain' }}
+                                  />
+                                  {mediaList.length > 1 && (
+                                    <div style={{ position: 'absolute', bottom: '12px', right: '12px', background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: '12px', fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>
+                                      1 / {mediaList.length}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Action Bar */}
+                              <div style={{ padding: '12px 16px 8px 16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                <button 
+                                  onClick={() => handleLikePost(post.id)}
+                                  style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: hasLiked ? 'var(--neon)' : '#ccc', fontSize: '18px', fontWeight: 'bold' }}
+                                >
+                                  {hasLiked ? '❤️' : '🤍'}
+                                  <span style={{ fontSize: '13px', color: '#aaa' }}>{post.likes.length}</span>
+                                </button>
+                                <button 
+                                  onClick={() => setActiveCommentsPostId(activeCommentsPostId === post.id ? null : post.id)}
+                                  style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: '#ccc', fontSize: '18px' }}
+                                >
+                                  💬
+                                  <span style={{ fontSize: '13px', color: '#aaa' }}>{post.comments.length}</span>
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(`${window.location.origin}/chat`);
+                                    alert('Link copied to clipboard!');
+                                  }}
+                                  style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: '#ccc', fontSize: '18px', marginLeft: 'auto' }}
+                                  title="Share Post"
+                                >
+                                  🔗
+                                </button>
+                              </div>
+
+                              {/* Caption */}
+                              {post.caption && (
+                                <div style={{ padding: '0 16px 12px 16px', fontSize: '13px', lineHeight: '1.5', color: '#ccc' }}>
+                                  <span style={{ fontWeight: 'bold', color: '#fff', marginRight: '8px' }}>
+                                    {post.author.screen_name || post.author.name}
+                                  </span>
+                                  {post.caption.split(' ').map((word: string, i: number) => {
+                                    if (word.startsWith('#')) {
+                                      return <span key={i} style={{ color: 'var(--neon)', marginRight: '4px' }}>{word}</span>;
+                                    } else if (word.startsWith('@')) {
+                                      return <span key={i} style={{ color: '#66fcf1', marginRight: '4px' }}>{word}</span>;
+                                    }
+                                    return word + ' ';
+                                  })}
+                                </div>
+                              )}
+
+                              {/* Comments Accordion */}
+                              {activeCommentsPostId === post.id && (
+                                <div style={{ borderTop: '1px solid rgba(255,255,255,0.03)', background: 'rgba(0,0,0,0.1)', padding: '12px 16px' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '200px', overflowY: 'auto', marginBottom: '12px' }}>
+                                    {post.comments.length === 0 ? (
+                                      <div style={{ fontSize: '11px', color: '#666', textAlign: 'center', padding: '10px' }}>No comments yet. Be the first to comment!</div>
+                                    ) : (
+                                      post.comments.map((comment: any) => (
+                                        <div key={comment.id} style={{ display: 'flex', gap: '8px', fontSize: '12px', alignItems: 'flex-start' }}>
+                                          <img 
+                                            src={getAvatarUrl(comment.user.name, 'Other', comment.user.avatar_url)} 
+                                            alt="" 
+                                            style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', marginTop: '2px' }}
+                                          />
+                                          <div style={{ flex: 1 }}>
+                                            <span style={{ fontWeight: 'bold', color: '#fff', marginRight: '6px' }}>
+                                              {comment.user.screen_name || comment.user.name}
+                                            </span>
+                                            <span style={{ color: '#ccc' }}>{comment.content}</span>
+                                          </div>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                  <form onSubmit={(e) => handleAddComment(e, post.id)} style={{ display: 'flex', gap: '8px' }}>
+                                    <input 
+                                      type="text" 
+                                      placeholder="Add a comment..." 
+                                      value={commentText}
+                                      onChange={(e) => setCommentText(e.target.value)}
+                                      style={{
+                                        flex: 1,
+                                        background: 'rgba(0,0,0,0.3)',
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        borderRadius: '4px',
+                                        padding: '6px 10px',
+                                        fontSize: '12px',
+                                        color: '#fff'
+                                      }}
+                                    />
+                                    <button 
+                                      type="submit"
+                                      style={{
+                                        background: 'var(--neon)',
+                                        border: 'none',
+                                        color: '#fff',
+                                        padding: '6px 12px',
+                                        borderRadius: '4px',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer',
+                                        fontSize: '11px'
+                                      }}
+                                    >
+                                      Post
+                                    </button>
+                                  </form>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 ) : activeTab === 'tasks' ? (
                   <div className="tasks-area">
                     <div className="tasks-header">
@@ -5457,6 +5853,73 @@ export default function ChatPage() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {isCreatePostOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(8px)' }}>
+          <div style={{ background: '#121212', border: '1px solid rgba(255, 77, 26, 0.3)', borderRadius: '12px', padding: '24px', width: '500px', maxWidth: '90%', display: 'flex', flexDirection: 'column', gap: '16px', color: '#fff', boxShadow: '0 8px 32px rgba(255, 77, 26, 0.15)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--neon)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>Create Community Post</h2>
+              <button onClick={() => { setIsCreatePostOpen(false); setPostCaption(''); setPostFiles(null); }} style={{ background: 'transparent', border: 'none', color: '#aaa', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+            </div>
+            <form onSubmit={handleCreatePost} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '12px', color: '#aaa', textTransform: 'uppercase' }}>Caption / Update Details</label>
+                <textarea 
+                  placeholder="Share what is happening behind-the-scenes, announcements, hashtags..." 
+                  value={postCaption}
+                  onChange={(e) => setPostCaption(e.target.value)}
+                  rows={4}
+                  style={{
+                    background: 'rgba(0,0,0,0.3)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '6px',
+                    padding: '10px',
+                    color: '#fff',
+                    fontSize: '13px',
+                    fontFamily: 'inherit',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '12px', color: '#aaa', textTransform: 'uppercase' }}>Images (Select up to 10)</label>
+                <input 
+                  type="file" 
+                  multiple 
+                  accept="image/*"
+                  onChange={(e) => setPostFiles(e.target.files)}
+                  style={{
+                    color: '#ccc',
+                    fontSize: '13px'
+                  }}
+                />
+                {postFiles && postFiles.length > 0 && (
+                  <div style={{ fontSize: '11px', color: 'var(--neon)', marginTop: '4px' }}>
+                    Selected {postFiles.length} file(s) ready to upload.
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '10px' }}>
+                <button 
+                  type="button"
+                  onClick={() => { setIsCreatePostOpen(false); setPostCaption(''); setPostFiles(null); }}
+                  style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#ccc', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  style={{ background: 'var(--neon)', border: 'none', color: '#fff', padding: '8px 24px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}
+                >
+                  Publish Post
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -81,6 +81,7 @@ try {
   const creditsRoutes = require('./routes/credits');
   const paymentRoutes = require('./routes/payments');
   const communityRoutes = require('./routes/community');
+  const communityPostsRoutes = require('./routes/posts');
   const portfolioRoutes = require('./routes/portfolio');
   const ratingRoutes = require('./routes/ratings');
   const servicesRoutes = require('./routes/services');
@@ -234,6 +235,7 @@ app.use('/api/payments', paymentRateLimiter, paymentRoutes);
 app.use('/api/community/create-order', paymentRateLimiter);
 app.use('/api/community/verify-payment', paymentRateLimiter);
 app.use('/api/community', communityRoutes);
+app.use('/api/community', communityPostsRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/services', servicesRoutes);
@@ -450,6 +452,7 @@ app.use((err, req, res, next) => {
   const { cleanupExpiredDrafts } = require('./utils/cleanupDrafts');
   const { initializeModerationTable } = require('./utils/dbInit');
   const { cleanupPendingCommunityPayments } = require('./utils/cleanupCommunityPayments');
+  const { checkAndSendProfileReminders } = require('./utils/profileReminder');
 
   if (require.main === module || process.env.TAKE_ONE_DB_BOOT_CHECK === 'true') {
     connectDB()
@@ -461,8 +464,10 @@ app.use((err, req, res, next) => {
       })
       .then(() => cleanupExpiredDrafts(true))
       .then(() => cleanupPendingCommunityPayments())
+      .then(() => checkAndSendProfileReminders())
       .then(() => {
         setInterval(cleanupPendingCommunityPayments, 15 * 60 * 1000);
+        setInterval(checkAndSendProfileReminders, 24 * 60 * 60 * 1000); // Check once a day
       })
       .catch((error) => {
         console.error('Database boot check failed:', error.message);

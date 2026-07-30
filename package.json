@@ -27,6 +27,7 @@
     "@prisma/client": "^5.22.0",
     "@sentry/nextjs": "^10.53.1",
     "@sentry/node": "^10.53.1",
+    "@supabase/supabase-js": "^2.111.0",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "cookie-parser": "^1.4.7",

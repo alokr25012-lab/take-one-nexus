@@ -59,6 +59,10 @@ model User {
   website_offers_created  WebsiteOffer[]         @relation("AdminOffers")
   website_orders          WebsiteOrder[]         @relation("UserOrders")
   website_maintenance     WebsiteMaintenance[]   @relation("UserMaintenance")
+  community_posts         CommunityPost[]
+  post_likes              CommunityPostLike[]
+  post_comments           CommunityPostComment[]
+  profile_reminder_logs   ProfileReminderLog[]
 
   @@index([secondary_role], map: "idx_users_secondary_role")
   @@index([email_verified], map: "idx_users_email_verified")
@@ -375,6 +379,7 @@ model Community {
   subscriptions   CommunitySubscription[]
   invitations     CommunityInvitation[]
   join_requests   CommunityJoinRequest[]
+  posts           CommunityPost[]
 
   @@map("communities")
 }
@@ -623,6 +628,66 @@ model WebsiteMaintenance {
   @@index([user_id], map: "idx_website_maintenance_user_id")
   @@map("website_maintenance")
 }
+
+model CommunityPost {
+  id           Int                    @id @default(autoincrement()) @db.UnsignedInt
+  community_id Int                    @db.UnsignedInt
+  author_id    Int                    @db.UnsignedInt
+  caption      String?                @db.Text
+  media_urls   Json                   // JSON array of image/video URLs
+  is_pinned    Boolean                @default(false)
+  created_at   DateTime               @default(now()) @db.Timestamp(0)
+  updated_at   DateTime               @default(now()) @updatedAt @db.Timestamp(0)
+
+  community    Community              @relation(fields: [community_id], references: [id], onDelete: Cascade)
+  author       User                   @relation(fields: [author_id], references: [id], onDelete: Cascade)
+  likes        CommunityPostLike[]
+  comments     CommunityPostComment[]
+
+  @@index([community_id])
+  @@index([author_id])
+  @@map("community_posts")
+}
+
+model CommunityPostLike {
+  id         Int           @id @default(autoincrement()) @db.UnsignedInt
+  post_id    Int           @db.UnsignedInt
+  user_id    Int           @db.UnsignedInt
+  created_at DateTime      @default(now()) @db.Timestamp(0)
+
+  post       CommunityPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user       User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([post_id, user_id])
+  @@map("community_post_likes")
+}
+
+model CommunityPostComment {
+  id         Int           @id @default(autoincrement()) @db.UnsignedInt
+  post_id    Int           @db.UnsignedInt
+  user_id    Int           @db.UnsignedInt
+  content    String        @db.Text
+  created_at DateTime      @default(now()) @db.Timestamp(0)
+  updated_at DateTime      @default(now()) @updatedAt @db.Timestamp(0)
+
+  post       CommunityPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user       User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([post_id])
+  @@map("community_post_comments")
+}
+
+model ProfileReminderLog {
+  id         Int      @id @default(autoincrement()) @db.UnsignedInt
+  user_id    Int      @db.UnsignedInt
+  sent_at    DateTime @default(now()) @db.Timestamp(0)
+
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, sent_at])
+  @@map("profile_reminder_logs")
+}
+
 
 
 

@@ -19,6 +19,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { uploadToStorage } = require('../utils/supabase');
 
 // Rate limiters
 const loginLimiter = createRateLimiter({
@@ -64,22 +65,14 @@ const avatarUploadLimiter = createRateLimiter({
 });
 
 
-// Ensure the target server-side upload directory exists
+// Fallback disk upload dir for when Supabase is not configured
 const uploadDir = path.join(__dirname, '../public/uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const userId = req.user?.id || 'anonymous';
-    const ext = path.extname(file.originalname);
-    cb(null, `avatar-${userId}-${Date.now()}${ext}`);
-  }
-});
+// Use memoryStorage so we can forward the buffer to Supabase
+const storage = multer.memoryStorage();
 
 // Image filter validation
 const fileFilter = (req, file, cb) => {
@@ -865,7 +858,7 @@ router.put('/:id', authenticateUser, requireSameUser, profileUpdateLimiter, asyn
 
 /**
  * POST /api/users/upload-avatar
- * File-handling route for profile pictures
+ * File-handling route for profile pictures (uploads to Supabase Storage / local fallback)
  */
 router.post('/upload-avatar', authenticateUser, uploadLimiter, avatarUploadLimiter, upload.single('avatar'), async (req, res) => {
   try {
@@ -874,9 +867,17 @@ router.post('/upload-avatar', authenticateUser, uploadLimiter, avatarUploadLimit
     }
 
     const userId = Number(req.user.id);
-    
-    // This is the public relative URL pointing to the file on disk
-    const avatarUrl = `/uploads/${req.file.filename}`;
+    const ext = path.extname(req.file.originalname) || '.jpg';
+    // Generate unique filename — never trust user-provided filename
+    const fileName = `avatar-${userId}-${Date.now()}${ext}`;
+
+    // Upload to Supabase (with local disk fallback)
+    const avatarUrl = await uploadToStorage(
+      req.file.buffer,
+      'profiles',
+      fileName,
+      req.file.mimetype
+    );
 
     // Update the database record using Prisma
     await prisma.user.update({

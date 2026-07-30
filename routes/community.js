@@ -10,6 +10,7 @@ const { captureError } = require('../src/lib/sentry');
 const { uploadLogo } = require('../middleware/upload');
 const { createRateLimiter, communityLimiter } = require('../middleware/rateLimiter');
 const { isValidSecureUrl } = require('../utils/security/urlValidator');
+const { uploadToStorage } = require('../utils/supabase');
 
 
 const inviteLimiter = createRateLimiter({
@@ -1308,10 +1309,6 @@ router.post('/logo', authenticateUser, (req, res) => {
 
       const communityId = Number(req.body.communityId || req.body.community_id);
       if (!communityId) {
-        // Delete uploaded file if ID is missing
-        if (fs.existsSync(req.file.path)) {
-          fs.unlinkSync(req.file.path);
-        }
         return res.status(400).json({ success: false, message: 'Community ID is required' });
       }
 
@@ -1325,20 +1322,21 @@ router.post('/logo', authenticateUser, (req, res) => {
       });
 
       if (!membership) {
-        // Delete uploaded file if unauthorized
-        if (fs.existsSync(req.file.path)) {
-          fs.unlinkSync(req.file.path);
-        }
         return res.status(403).json({ success: false, message: 'Access denied: Community Management permissions required' });
       }
 
-      const logoUrl = `/uploads/logos/${req.file.filename}`;
+      const ext = path.extname(req.file.originalname) || '.jpg';
+      const fileName = `community-logo-${communityId}-${Date.now()}${ext}`;
+
+      // Upload using Supabase (with local fallback)
+      const logoUrl = await uploadToStorage(req.file.buffer, 'communities', fileName, req.file.mimetype);
+
       await prisma.community.update({
         where: { id: communityId },
         data: { avatar_url: logoUrl }
       });
 
-      logCommunityEvent('logo_upload_success', { communityId, userId: Number(req.user.id), fileName: req.file.filename, size: req.file.size });
+      logCommunityEvent('logo_upload_success', { communityId, userId: Number(req.user.id), fileName, size: req.file.size });
 
       res.json({
         success: true,
@@ -1348,9 +1346,6 @@ router.post('/logo', authenticateUser, (req, res) => {
     } catch (error) {
       console.error('[Community] Logo upload error:', error.message);
       logCommunityEvent('logo_upload_failed', { communityId: Number(req.body.communityId || req.body.community_id), userId: Number(req.user.id), error: error.message });
-      if (req.file && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
       res.status(500).json({ success: false, message: 'Internal server error' });
     }
   });
