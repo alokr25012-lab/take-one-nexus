@@ -46,7 +46,7 @@
     "mysql2": "^3.11.5",
     "next": "^16.2.4",
     "nodemailer": "^6.10.1",
-    "posthog-js": "^1.373.5",
+    "posthog-js": "^1.376.2",
     "prisma": "^5.22.0",
     "pusher": "^5.3.3",
     "pusher-js": "^8.5.0",
