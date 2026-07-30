@@ -307,7 +307,8 @@ router.post('/register', authLimiter, registerLimiter, registerValidation, async
         gender: user.gender,
         screen_name: screen_name || null,
         display_preference: display_preference || 'Show Real Name Only',
-        credits: 0
+        credits: 0,
+        avatar_url: null
       },
       token: token
     });
@@ -411,7 +412,7 @@ router.post('/login', authLimiter, loginLimiter, loginValidation, async (req, re
     let rows;
     try {
       [rows] = await pool.query(
-        `SELECT id, name, email, password, role, secondary_role, college, city, gender, screen_name, display_preference, social_links, credits, email_verified
+        `SELECT id, name, email, password, role, secondary_role, college, city, gender, screen_name, display_preference, social_links, credits, email_verified, avatar_url
          FROM users
          WHERE email = ?
          LIMIT 1`,
@@ -473,7 +474,8 @@ router.post('/login', authLimiter, loginLimiter, loginValidation, async (req, re
         display_preference: user.display_preference || 'Show Real Name Only',
         social_links: user.social_links || null,
         credits: user.credits || 0,
-        email_verified: user.email_verified === 1 || user.email_verified === true
+        email_verified: user.email_verified === 1 || user.email_verified === true,
+        avatar_url: user.avatar_url || null
       },
       token: token
     });

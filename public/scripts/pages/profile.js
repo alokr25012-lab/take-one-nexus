@@ -77,12 +77,15 @@ async function changeAvatar(input) {
                 currentProfileData.avatar_url = result.avatar_url;
             }
 
-            // 3. Keep client-session in sync
+            // 3. Keep client-session in sync — merge so no fields are lost
             if (typeof API !== 'undefined' && API.auth) {
-                const user = API.auth.getUser();
-                if (user) {
-                    user.avatar_url = result.avatar_url;
-                    API.auth.saveToken(API.auth.getToken(), user); // Save back to local storage
+                const existingUser = API.auth.getUser();
+                if (existingUser) {
+                    // Spread existing user first, then overwrite avatar_url so nothing else is lost
+                    API.auth.saveToken(API.auth.getToken(), {
+                        ...existingUser,
+                        avatar_url: result.avatar_url
+                    });
                 }
             }
         } else {
@@ -967,14 +970,18 @@ async function saveProfile() {
         const response = await API.users.updateProfile(authUser.id, payload);
         if (response.success && response.data) {
             populateProfile(response.data);
+            // Preserve ALL existing fields in localStorage — only update what the server returned
+            const existingUser = API.auth.getUser() || {};
             API.auth.saveToken(API.auth.getToken(), {
+                ...existingUser,
                 id: response.data.id,
                 name: response.data.name,
                 role: response.data.role || '',
                 college: response.data.college || '',
                 city: response.data.city || '',
                 gender: response.data.gender || 'Prefer not to say',
-                availability: response.data.availability || 'Available'
+                availability: response.data.availability || 'Available',
+                avatar_url: response.data.avatar_url || existingUser.avatar_url || ''
             });
             if (typeof showToast === 'function') showToast('Profile saved permanently ✦');
         }

@@ -59,6 +59,96 @@ async function requireCommunityAdminOrModerator(req, res, next) {
 }
 
 /**
+ * GET /api/community/posts/global-feed?page=1&limit=10
+ * Fetch posts from ALL communities, visible to any authenticated user.
+ * No membership check — it's a public global community feed.
+ * Returns: post data, author (with avatar_url), community name+avatar, likes, comments, liked_by_me flag.
+ * Ordered: newest first.
+ */
+router.get('/posts/global-feed', authenticateUser, async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(20, Math.max(1, parseInt(req.query.limit) || 10));
+    const skip = (page - 1) * limit;
+    const currentUserId = Number(req.user.id);
+
+    const [posts, totalCount] = await Promise.all([
+      prisma.communityPost.findMany({
+        skip,
+        take: limit,
+        include: {
+          author: {
+            select: {
+              id: true,
+              name: true,
+              screen_name: true,
+              display_preference: true,
+              avatar_url: true,
+              role: true
+            }
+          },
+          community: {
+            select: {
+              id: true,
+              name: true,
+              avatar_url: true
+            }
+          },
+          likes: {
+            select: { user_id: true }
+          },
+          comments: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  screen_name: true,
+                  display_preference: true,
+                  avatar_url: true
+                }
+              }
+            },
+            orderBy: { created_at: 'asc' },
+            take: 5 // Only fetch the first 5 comments for the feed; more can be loaded separately
+          },
+          _count: {
+            select: { comments: true, likes: true }
+          }
+        },
+        orderBy: [
+          { is_pinned: 'desc' },
+          { created_at: 'desc' }
+        ]
+      }),
+      prisma.communityPost.count()
+    ]);
+
+    // Add liked_by_me flag for the current user
+    const postsWithLikedByMe = posts.map(post => ({
+      ...post,
+      liked_by_me: post.likes.some(like => like.user_id === currentUserId),
+      like_count: post._count.likes,
+      comment_count: post._count.comments
+    }));
+
+    res.json({
+      success: true,
+      data: postsWithLikedByMe,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        hasMore: skip + posts.length < totalCount
+      }
+    });
+  } catch (error) {
+    console.error('Global feed fetch error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to load global community feed' });
+  }
+});
+
+/**
  * GET /api/community/:communityId/posts
  * Fetch all posts in a community (pinned posts first, then newest)
  */
