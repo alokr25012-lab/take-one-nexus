@@ -73,7 +73,10 @@ function logCommunityEvent(action, details = {}) {
  */
 router.get('/pricing-configs', authenticateUser, async (req, res) => {
   try {
-    const configs = await prisma.communityPricingConfig.findMany();
+    const configs = await prisma.communityPricingConfig.findMany({
+      where: { plan_type: { not: 'Starter' } },
+      orderBy: { plan_type: 'asc' },
+    });
     res.json({ success: true, data: configs });
   } catch (error) {
     console.error('[Community] Get pricing error:', error.message);
@@ -1666,6 +1669,12 @@ router.put('/pricing-configs/:planType', authenticateUser, requireAdmin, [
 ], async (req, res) => {
   try {
     const { planType } = req.params;
+
+    // Starter plan has been retired — block any update attempts
+    if (planType.toLowerCase() === 'starter') {
+      return res.status(403).json({ success: false, message: 'The Starter plan has been discontinued and cannot be modified.' });
+    }
+
     const { base_price, max_members, per_member_price } = req.body;
 
     const updated = await prisma.communityPricingConfig.upsert({
