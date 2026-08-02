@@ -27,7 +27,8 @@ export default function DeveloperIssuesPage() {
       const res = await fetch('/api/issues', {
         headers: { 'Content-Type': 'application/json' }
       });
-      const data = await res.json();
+      if (!res.ok) throw new Error("Request failed");
+const data = await res.json();
       if (res.status === 403) {
         setError('Access Denied. Admin Role Required.');
         return;
@@ -54,7 +55,8 @@ export default function DeveloperIssuesPage() {
         method: 'PUT',
         body: JSON.stringify({ status })
       });
-      const data = await res.json();
+      if (!res.ok) throw new Error("Request failed");
+const data = await res.json();
       if (data.success) {
         setIssues(issues.map(issue => issue.id === id ? { ...issue, status } : issue));
       }
@@ -67,7 +69,8 @@ export default function DeveloperIssuesPage() {
     if (!confirm('Are you sure you want to delete this issue?')) return;
     try {
       const res = await fetchWithCSRF(`/api/issues/${id}`, { method: 'DELETE' });
-      const data = await res.json();
+      if (!res.ok) throw new Error("Request failed");
+const data = await res.json();
       if (data.success) {
         setIssues(issues.filter(issue => issue.id !== id));
       }

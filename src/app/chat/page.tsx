@@ -4097,7 +4097,7 @@ export default function ChatPage() {
                   const perMemberPrice = customCfg ? Number(customCfg.per_member_price) : 2;
                   const maxLimit = customCfg ? Number(customCfg.max_members) : 1000;
                   const calculatedPrice = basePrice + (customMembersCount * perMemberPrice);
-                  const isInvalid = isNaN(customMembersCount) || customMembersCount < 1 || customMembersCount > maxLimit;
+                  const isInvalid = Number.isNaN(customMembersCount) || customMembersCount < 1 || customMembersCount > maxLimit;
 
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '16px', marginTop: '8px' }}>
@@ -4157,19 +4157,19 @@ export default function ChatPage() {
                     </div>
                     <button 
                       onClick={handlePricingProceed}
-                      disabled={selectedPlan === 'Custom' && (isNaN(customMembersCount) || customMembersCount < 1 || customMembersCount > (pricingConfigs.find(c => c.plan_type === 'Custom')?.max_members || 1000))}
+                      disabled={selectedPlan === 'Custom' && (Number.isNaN(customMembersCount) || customMembersCount < 1 || customMembersCount > (pricingConfigs.find(c => c.plan_type === 'Custom')?.max_members || 1000))}
                       style={{ 
-                        background: (selectedPlan === 'Custom' && (isNaN(customMembersCount) || customMembersCount < 1 || customMembersCount > (pricingConfigs.find(c => c.plan_type === 'Custom')?.max_members || 1000))) ? '#555' : 'var(--neon)', 
+                        background: (selectedPlan === 'Custom' && (Number.isNaN(customMembersCount) || customMembersCount < 1 || customMembersCount > (pricingConfigs.find(c => c.plan_type === 'Custom')?.max_members || 1000))) ? '#555' : 'var(--neon)', 
                         border: 'none', 
                         padding: '12px 24px', 
                         borderRadius: '6px', 
                         color: '#fff', 
                         fontWeight: 'bold', 
-                        cursor: (selectedPlan === 'Custom' && (isNaN(customMembersCount) || customMembersCount < 1 || customMembersCount > (pricingConfigs.find(c => c.plan_type === 'Custom')?.max_members || 1000))) ? 'not-allowed' : 'pointer', 
+                        cursor: (selectedPlan === 'Custom' && (Number.isNaN(customMembersCount) || customMembersCount < 1 || customMembersCount > (pricingConfigs.find(c => c.plan_type === 'Custom')?.max_members || 1000))) ? 'not-allowed' : 'pointer', 
                         transition: 'filter 0.2s' 
                       }}
                       onMouseOver={(e) => {
-                        if (!(selectedPlan === 'Custom' && (isNaN(customMembersCount) || customMembersCount < 1 || customMembersCount > (pricingConfigs.find(c => c.plan_type === 'Custom')?.max_members || 1000)))) {
+                        if (!(selectedPlan === 'Custom' && (Number.isNaN(customMembersCount) || customMembersCount < 1 || customMembersCount > (pricingConfigs.find(c => c.plan_type === 'Custom')?.max_members || 1000)))) {
                           e.currentTarget.style.filter = 'brightness(1.1)';
                         }
                       }}
