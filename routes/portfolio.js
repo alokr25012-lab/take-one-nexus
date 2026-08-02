@@ -9,7 +9,7 @@ const router = express.Router();
 router.get('/user/:userId', async (req, res) => {
   try {
     const userId = Number(req.params.userId);
-    if (isNaN(userId)) {
+    if (Number.isNaN(userId)) {
       return res.status(400).json({ success: false, message: 'Invalid User ID' });
     }
 
@@ -85,7 +85,7 @@ router.post('/', authenticateUser, requireVerified, portfolioLimiter, async (req
 router.put('/:id', authenticateUser, portfolioLimiter, async (req, res) => {
   try {
     const portfolioId = Number(req.params.id);
-    if (isNaN(portfolioId)) {
+    if (Number.isNaN(portfolioId)) {
       return res.status(400).json({ success: false, message: 'Invalid portfolio ID' });
     }
 
@@ -158,7 +158,7 @@ router.put('/:id', authenticateUser, portfolioLimiter, async (req, res) => {
 router.delete('/:id', authenticateUser, portfolioLimiter, async (req, res) => {
   try {
     const portfolioId = Number(req.params.id);
-    if (isNaN(portfolioId)) {
+    if (Number.isNaN(portfolioId)) {
       return res.status(400).json({ success: false, message: 'Invalid portfolio ID' });
     }
 
