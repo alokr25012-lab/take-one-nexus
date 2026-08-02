@@ -468,6 +468,21 @@
     titleText.textContent = 'Community Feed';
     titleWrap.appendChild(titleText);
 
+    // Create post button (will only show if user has Owner/Admin/Moderator role in at least one community)
+    const createPostBtn = document.createElement('button');
+    createPostBtn.className = 'gf-create-post-btn';
+    createPostBtn.style.display = 'none';
+    createPostBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; margin-right: 4px;">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      Create Post
+    `;
+    createPostBtn.addEventListener('click', () => {
+      buildCreatePostModal();
+    });
+
     const closeBtn = document.createElement('button');
     closeBtn.className = 'gf-panel-close';
     closeBtn.setAttribute('aria-label', 'Close feed');
@@ -475,7 +490,28 @@
     closeBtn.addEventListener('click', closeFeedPanel);
 
     header.appendChild(titleWrap);
+    header.appendChild(createPostBtn);
     header.appendChild(closeBtn);
+
+    // Fetch user's communities to check roles
+    async function checkPostPermissions() {
+      try {
+        const res = await fetch('/api/community/my-community', { credentials: 'same-origin' });
+        const json = await res.json();
+        if (json.success && Array.isArray(json.communities)) {
+          const eligibleCommunities = json.communities.filter(c => 
+            ['owner', 'admin', 'moderator'].includes(String(c.role || '').toLowerCase())
+          );
+          if (eligibleCommunities.length > 0) {
+            createPostBtn.style.display = 'flex';
+            panel.setAttribute('data-user-communities', JSON.stringify(eligibleCommunities));
+          }
+        }
+      } catch (err) {
+        console.warn('Could not determine post permissions:', err);
+      }
+    }
+    checkPostPermissions();
 
     const list = document.createElement('div');
     list.className = 'gf-post-list';
@@ -529,6 +565,263 @@
       feedPanel.classList.remove('is-open');
       document.body.classList.remove('gf-panel-open');
     }
+  }
+
+  function buildCreatePostModal() {
+    if (!feedPanel) return;
+    const communitiesRaw = feedPanel.getAttribute('data-user-communities');
+    const eligibleComms = communitiesRaw ? JSON.parse(communitiesRaw) : [];
+    if (eligibleComms.length === 0) {
+      if (typeof showToast === 'function') showToast('No post permissions ✦');
+      return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'gf-modal-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.inset = '0';
+    overlay.style.background = 'rgba(3,4,6,0.85)';
+    overlay.style.backdropFilter = 'blur(8px)';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.zIndex = '99999';
+
+    const card = document.createElement('div');
+    card.className = 'gf-modal-card';
+    card.style.width = '90%';
+    card.style.maxWidth = '500px';
+    card.style.background = '#0d1118';
+    card.style.border = '1px solid rgba(255, 77, 26, 0.3)';
+    card.style.boxShadow = '0 0 30px rgba(255,77,26,0.2)';
+    card.style.padding = '24px';
+    card.style.borderRadius = '12px';
+    card.style.display = 'flex';
+    card.style.flexDirection = 'column';
+    card.style.gap = '16px';
+
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.style.alignItems = 'center';
+    const title = document.createElement('h3');
+    title.textContent = 'Create New Post';
+    title.style.fontFamily = 'Space Mono, monospace';
+    title.style.color = '#ff4d1a';
+    title.style.margin = '0';
+    title.style.fontSize = '16px';
+    title.style.textTransform = 'uppercase';
+    title.style.letterSpacing = '1px';
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '&times;';
+    closeBtn.style.color = '#888';
+    closeBtn.style.fontSize = '24px';
+    closeBtn.style.cursor = 'pointer';
+    closeBtn.addEventListener('click', () => overlay.remove());
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+
+    const commLabel = document.createElement('label');
+    commLabel.textContent = 'Select Community';
+    commLabel.style.fontSize = '10px';
+    commLabel.style.color = '#888';
+    commLabel.style.textTransform = 'uppercase';
+    const select = document.createElement('select');
+    select.style.padding = '10px';
+    select.style.background = 'rgba(255,255,255,0.04)';
+    select.style.border = '1px solid rgba(255,255,255,0.1)';
+    select.style.color = '#fff';
+    select.style.borderRadius = '6px';
+    select.style.fontSize = '12px';
+    eligibleComms.forEach(c => {
+      const option = document.createElement('option');
+      option.value = c.id;
+      option.textContent = c.name;
+      select.appendChild(option);
+    });
+
+    const captionLabel = document.createElement('label');
+    captionLabel.textContent = 'Caption';
+    captionLabel.style.fontSize = '10px';
+    captionLabel.style.color = '#888';
+    captionLabel.style.textTransform = 'uppercase';
+    const textarea = document.createElement('textarea');
+    textarea.placeholder = 'What is on your mind?';
+    textarea.rows = 4;
+    textarea.style.padding = '10px';
+    textarea.style.background = 'rgba(255,255,255,0.04)';
+    textarea.style.border = '1px solid rgba(255,255,255,0.1)';
+    textarea.style.color = '#fff';
+    textarea.style.borderRadius = '6px';
+    textarea.style.resize = 'none';
+    textarea.style.fontSize = '12px';
+
+    const tagsLabel = document.createElement('label');
+    tagsLabel.textContent = 'Hashtags (space separated)';
+    tagsLabel.style.fontSize = '10px';
+    tagsLabel.style.color = '#888';
+    tagsLabel.style.textTransform = 'uppercase';
+    const tagsInput = document.createElement('input');
+    tagsInput.placeholder = 'e.g. filmmaking cinematography';
+    tagsInput.style.padding = '10px';
+    tagsInput.style.background = 'rgba(255,255,255,0.04)';
+    tagsInput.style.border = '1px solid rgba(255,255,255,0.1)';
+    tagsInput.style.color = '#fff';
+    tagsInput.style.borderRadius = '6px';
+    tagsInput.style.fontSize = '12px';
+
+    const fileLabel = document.createElement('label');
+    fileLabel.textContent = 'Images (Select up to 10)';
+    fileLabel.style.fontSize = '10px';
+    fileLabel.style.color = '#888';
+    fileLabel.style.textTransform = 'uppercase';
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.multiple = true;
+    fileInput.accept = 'image/jpeg, image/png, image/webp';
+    fileInput.style.display = 'none';
+    const uploadTrigger = document.createElement('button');
+    uploadTrigger.textContent = 'Choose Files';
+    uploadTrigger.style.padding = '10px';
+    uploadTrigger.style.background = 'rgba(255, 77, 26, 0.1)';
+    uploadTrigger.style.border = '1px solid rgba(255, 77, 26, 0.4)';
+    uploadTrigger.style.color = '#ff4d1a';
+    uploadTrigger.style.borderRadius = '6px';
+    uploadTrigger.style.cursor = 'pointer';
+    uploadTrigger.style.fontSize = '11px';
+    uploadTrigger.addEventListener('click', (e) => { e.preventDefault(); fileInput.click(); });
+
+    const previewGrid = document.createElement('div');
+    previewGrid.style.display = 'grid';
+    previewGrid.style.gridTemplateColumns = 'repeat(4, 1fr)';
+    previewGrid.style.gap = '8px';
+    previewGrid.style.marginTop = '8px';
+
+    let selectedFiles = [];
+
+    fileInput.addEventListener('change', () => {
+      previewGrid.innerHTML = '';
+      selectedFiles = Array.from(fileInput.files || []).slice(0, 10);
+      selectedFiles.forEach((file) => {
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+          if (typeof showToast === 'function') showToast('Only JPEGs, PNGs, and WEBP supported! ✦');
+          return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          if (typeof showToast === 'function') showToast('Max image size is 10MB! ✦');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = document.createElement('img');
+          img.src = e.target.result;
+          img.style.width = '100%';
+          img.style.height = '60px';
+          img.style.objectFit = 'cover';
+          img.style.borderRadius = '4px';
+          img.style.border = '1px solid rgba(255,255,255,0.1)';
+          previewGrid.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    const actionRow = document.createElement('div');
+    actionRow.style.display = 'flex';
+    actionRow.style.justifyContent = 'flex-end';
+    actionRow.style.gap = '12px';
+    actionRow.style.marginTop = '8px';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.style.padding = '10px 20px';
+    cancelBtn.style.background = 'rgba(255,255,255,0.05)';
+    cancelBtn.style.border = '1px solid rgba(255,255,255,0.1)';
+    cancelBtn.style.color = '#ccc';
+    cancelBtn.style.borderRadius = '6px';
+    cancelBtn.style.cursor = 'pointer';
+    cancelBtn.style.fontSize = '12px';
+    cancelBtn.addEventListener('click', (e) => { e.preventDefault(); overlay.remove(); });
+
+    const submitBtn = document.createElement('button');
+    submitBtn.textContent = 'Submit';
+    submitBtn.style.padding = '10px 20px';
+    submitBtn.style.background = '#ff4d1a';
+    submitBtn.style.border = 'none';
+    submitBtn.style.color = '#fff';
+    submitBtn.style.borderRadius = '6px';
+    submitBtn.style.cursor = 'pointer';
+    submitBtn.style.fontWeight = 'bold';
+    submitBtn.style.fontSize = '12px';
+
+    submitBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (selectedFiles.length === 0) {
+        if (typeof showToast === 'function') showToast('At least one image is required! ✦');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Posting...';
+
+      // Parse tags
+      const rawTags = tagsInput.value.trim().split(/\s+/).filter(Boolean);
+      const hashtags = rawTags.map(t => t.startsWith('#') ? t : `#${t}`);
+      const captionText = `${textarea.value.trim()} ${hashtags.join(' ')}`.trim();
+
+      const formData = new FormData();
+      formData.append('caption', captionText);
+      selectedFiles.forEach((file) => {
+        formData.append('images', file);
+      });
+
+      try {
+        const token = localStorage.getItem('take_one_token');
+        const res = await fetch(`/api/community/${select.value}/posts`, {
+          method: 'POST',
+          headers: {
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: formData
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+          overlay.remove();
+          if (typeof showToast === 'function') showToast('Post created successfully! ✦');
+          // Add to beginning of global feed
+          const card = buildPostCard(json.data);
+          feedList.prepend(card);
+          requestAnimationFrame(() => card.classList.add('is-visible'));
+        } else {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit';
+          if (typeof showToast === 'function') showToast(json.message || 'Failed to create post');
+        }
+      } catch (err) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit';
+        if (typeof showToast === 'function') showToast('Network connection failure');
+      }
+    });
+
+    actionRow.appendChild(cancelBtn);
+    actionRow.appendChild(submitBtn);
+
+    card.appendChild(header);
+    card.appendChild(commLabel);
+    card.appendChild(select);
+    card.appendChild(captionLabel);
+    card.appendChild(textarea);
+    card.appendChild(tagsLabel);
+    card.appendChild(tagsInput);
+    card.appendChild(fileLabel);
+    card.appendChild(uploadTrigger);
+    card.appendChild(fileInput);
+    card.appendChild(previewGrid);
+    card.appendChild(actionRow);
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
   }
 
   // Close panel on Escape key

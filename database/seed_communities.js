@@ -12,7 +12,6 @@ async function seedCommunities() {
       await connection.query(`
         INSERT INTO community_pricing_configs (plan_type, base_price, max_members, per_member_price)
         VALUES 
-          ('Starter', 59.00, 20, 0.00),
           ('Growth', 99.00, 35, 0.00),
           ('Custom', 99.00, 1000, 2.00)
       `);
@@ -23,11 +22,6 @@ async function seedCommunities() {
         UPDATE community_pricing_configs 
         SET base_price = 99.00, max_members = 1000, per_member_price = 2.00
         WHERE plan_type = 'Custom'
-      `);
-      await connection.query(`
-        UPDATE community_pricing_configs 
-        SET base_price = 59.00, max_members = 20, per_member_price = 0.00
-        WHERE plan_type = 'Starter'
       `);
       await connection.query(`
         UPDATE community_pricing_configs 

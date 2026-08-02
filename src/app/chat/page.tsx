@@ -1553,7 +1553,7 @@ export default function ChatPage() {
 
   // Community config
   const [pricingConfigs, setPricingConfigs] = useState<any[]>([]);
-  const [selectedPlan, setSelectedPlan] = useState<'Starter' | 'Growth' | 'Custom'>('Starter');
+  const [selectedPlan, setSelectedPlan] = useState<'Growth' | 'Custom'>('Growth');
   const [customMembersCount, setCustomMembersCount] = useState(50);
   const [newCommunityName, setNewCommunityName] = useState('');
   const [newCommunityDesc, setNewCommunityDesc] = useState('');
@@ -4292,29 +4292,6 @@ export default function ChatPage() {
                     </p>
 
                     <div className="pricing-cards">
-                      <div 
-                        className={`pricing-card ${selectedPlan === 'Starter' ? 'selected' : ''}`}
-                        onClick={() => {
-                          setSelectedPlan('Starter');
-                          if (!isFounder) {
-                            fetchPricingConfigs();
-                          }
-                          setIsCommunityModalOpen(true);
-                        }}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <div>
-                          <h3>Starter</h3>
-                          <div className="price">₹{pricingConfigs.find(c => c.plan_type === 'Starter')?.base_price || '59'}</div>
-                          <div className="duration">Per 3 Months</div>
-                        </div>
-                        <ul className="features" style={{ marginTop: '16px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <li>✓ 20 Members limit</li>
-                          <li>✓ Standard group posting</li>
-                          <li>✓ Basic script sharing</li>
-                          <li>✓ Group chat channels</li>
-                        </ul>
-                      </div>
 
                       <div 
                         className={`pricing-card ${selectedPlan === 'Growth' ? 'selected' : ''}`}
@@ -5600,15 +5577,7 @@ export default function ChatPage() {
               <>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '12px', color: '#aaa', textTransform: 'uppercase' }}>Select Community Tier</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                    <div 
-                      onClick={() => setSelectedPlan('Starter')}
-                      style={{ border: `1px solid ${selectedPlan === 'Starter' ? 'var(--neon)' : 'rgba(255,255,255,0.1)'}`, background: selectedPlan === 'Starter' ? 'rgba(255,77,26,0.08)' : 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', cursor: 'pointer', textAlign: 'center', transition: 'border-color 0.2s' }}
-                    >
-                      <div style={{ fontWeight: 'bold', fontSize: '14px' }}>Starter</div>
-                      <div style={{ fontSize: '11px', color: '#aaa', margin: '4px 0' }}>20 Members</div>
-                      <div style={{ fontSize: '14px', color: 'var(--neon)', fontWeight: 'bold' }}>₹{pricingConfigs.find(c => c.plan_type === 'Starter')?.base_price || '59'} / 3 Months</div>
-                    </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     <div 
                       onClick={() => setSelectedPlan('Growth')}
                       style={{ border: `1px solid ${selectedPlan === 'Growth' ? 'var(--neon)' : 'rgba(255,255,255,0.1)'}`, background: selectedPlan === 'Growth' ? 'rgba(255,77,26,0.08)' : 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', cursor: 'pointer', textAlign: 'center', transition: 'border-color 0.2s' }}
@@ -5689,16 +5658,14 @@ export default function ChatPage() {
                     <div>
                       <span style={{ fontSize: '12px', color: '#aaa' }}>Total Due (3 Months Subscription):</span>
                       <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--neon)' }}>
-                        ₹{selectedPlan === 'Starter' 
-                          ? (pricingConfigs.find(c => c.plan_type === 'Starter')?.base_price || '59') 
-                          : selectedPlan === 'Growth' 
-                            ? (pricingConfigs.find(c => c.plan_type === 'Growth')?.base_price || '99') 
-                            : (() => {
-                                const customCfg = pricingConfigs.find(c => c.plan_type === 'Custom');
-                                const base = customCfg ? Number(customCfg.base_price) : 99;
-                                const per = customCfg ? Number(customCfg.per_member_price) : 2;
-                                return base + (customMembersCount * per);
-                              })()}
+                        ₹{selectedPlan === 'Growth' 
+                          ? (pricingConfigs.find(c => c.plan_type === 'Growth')?.base_price || '99') 
+                          : (() => {
+                              const customCfg = pricingConfigs.find(c => c.plan_type === 'Custom');
+                              const base = customCfg ? Number(customCfg.base_price) : 99;
+                              const per = customCfg ? Number(customCfg.per_member_price) : 2;
+                              return base + (customMembersCount * per);
+                            })()}
                       </div>
                     </div>
                     <button 

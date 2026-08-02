@@ -688,6 +688,29 @@ model ProfileReminderLog {
   @@map("profile_reminder_logs")
 }
 
+model PricingPlan {
+  id                 Int      @id @default(autoincrement()) @db.UnsignedInt
+  name               String   @db.VarChar(100)
+  slug               String   @unique @db.VarChar(100)
+  description        String?  @db.Text
+  badge              String?  @db.VarChar(50)
+  base_price         Decimal  @db.Decimal(10, 2)
+  billing_cycle      String   @default("3 Months") @db.VarChar(50)
+  included_members   Int      @db.UnsignedInt
+  extra_member_price Decimal  @default(0.00) @db.Decimal(10, 2)
+  features           Json?    // Array of strings, e.g., ["Feature 1", "Feature 2"]
+  button_text        String   @default("Select Plan") @db.VarChar(50)
+  theme_color        String   @default("var(--neon)") @db.VarChar(50)
+  icon               String?  @db.VarChar(50)
+  display_order      Int      @default(0)
+  is_active          Boolean  @default(true)
+  is_visible         Boolean  @default(true)
+  created_at         DateTime @default(now()) @db.Timestamp(0)
+  updated_at         DateTime @default(now()) @updatedAt @db.Timestamp(0)
+
+  @@map("pricing_plans")
+}
+
 
 
 

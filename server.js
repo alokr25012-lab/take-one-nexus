@@ -85,6 +85,7 @@ try {
   const portfolioRoutes = require('./routes/portfolio');
   const ratingRoutes = require('./routes/ratings');
   const servicesRoutes = require('./routes/services');
+  const pricingRoutes = require('./routes/pricing');
 
 const PORT = process.env.PORT || 3000;
 
@@ -96,7 +97,7 @@ const cspConfig = {
     defaultSrc: ["'self'"],
     scriptSrc: ["'self'", "'unsafe-eval'", "'unsafe-inline'", "https://us.i.posthog.com", "https://eu.i.posthog.com", "https://app.posthog.com", "https://cdn.jsdelivr.net", "https://js.sentry-cdn.com", "https://browser.sentry-cdn.com", "https://takeone-nexus.net.in", "https://www.takeone-nexus.net.in", "https://checkout.razorpay.com", "https://*.razorpay.com"],
     styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net"],
-    imgSrc: ["'self'", "blob:", "data:", "https://api.dicebear.com", "https://ui-avatars.com", "https://us.i.posthog.com", "https://eu.i.posthog.com"],
+    imgSrc: ["'self'", "blob:", "data:", "https://api.dicebear.com", "https://ui-avatars.com", "https://us.i.posthog.com", "https://eu.i.posthog.com", "https://*.supabase.co"],
     fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
     connectSrc: ["'self'", "https://us.i.posthog.com", "https://eu.i.posthog.com", "https://app.posthog.com", "https://sentry.io", "https://*.sentry.io", "wss://*.pusher.com", "https://*.pusher.com", "https://*.pusherapp.com", "wss://*.pusherapp.com", "http://localhost:*", "ws://localhost:*", "http://127.0.0.1:*", "ws://127.0.0.1:*", "https://takeone-nexus.net.in", "https://www.takeone-nexus.net.in", "https://admin.takeone-nexus.net.in", "https://scripts.takeone-nexus.net.in", "https://api.razorpay.com", "https://*.razorpay.com"],
     frameSrc: ["'self'", "https://us.posthog.com", "https://eu.posthog.com", "https://app.posthog.com", "https://api.razorpay.com", "https://*.razorpay.com", "https://checkout.razorpay.com", "https://admin.takeone-nexus.net.in", "https://scripts.takeone-nexus.net.in"],
@@ -239,6 +240,7 @@ app.use('/api/community', communityPostsRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/services', servicesRoutes);
+app.use('/api/pricing', pricingRoutes);
 
 app.post('/api/groups/create', (req, res) => {
   res.status(403).json({

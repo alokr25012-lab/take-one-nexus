@@ -153,7 +153,7 @@ router.get('/my-community', authenticateUser, async (req, res) => {
  * Create a Razorpay order for community subscription
  */
 const createOrderValidation = [
-  body('planType').isIn(['Starter', 'Growth', 'Custom']).withMessage('Invalid plan type'),
+  body('planType').isIn(['Growth', 'Custom']).withMessage('Invalid plan type'),
   body('memberCount').optional().isInt({ min: 1 }).withMessage('Member count must be positive integer'),
   validateRequest
 ];
@@ -1336,7 +1336,7 @@ router.post('/logo', authenticateUser, (req, res) => {
       const fileName = `${communityId}/avatar${ext}`;
 
       // Upload using Supabase (with local fallback)
-      const logoUrl = await uploadToStorage(req.file.buffer, 'community-avatars', fileName, req.file.mimetype);
+      const logoUrl = await uploadToStorage(req.file.buffer, 'communities', fileName, req.file.mimetype);
 
       await prisma.community.update({
         where: { id: communityId },

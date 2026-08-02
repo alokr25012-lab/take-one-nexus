@@ -374,6 +374,33 @@ body.gf-panel-open {
   background: rgba(6, 8, 10, 0.95);
   backdrop-filter: blur(12px);
   flex-shrink: 0;
+  gap: 12px;
+}
+
+.gf-create-post-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 212, 255, 0.5);
+  border-radius: 8px;
+  background: rgba(0, 212, 255, 0.1);
+  color: #00d4ff;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-left: auto;
+}
+
+.gf-create-post-btn:hover {
+  background: rgba(0, 212, 255, 0.2);
+  border-color: #00d4ff;
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
 }
 
 .gf-panel-title {
