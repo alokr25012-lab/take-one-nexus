@@ -46,8 +46,8 @@ router.post(
             if (event === 'payment.failed') {
                 const paymentEntity = payload.payload?.payment?.entity;
                 const orderId = paymentEntity?.order_id;
-                const userId = paymentEntity?.notes?.user_id ? parseInt(paymentEntity.notes.user_id) : (paymentEntity?.notes?.userId ? parseInt(paymentEntity.notes.userId) : null);
-                const draftId = paymentEntity?.notes?.draft_id ? parseInt(paymentEntity.notes.draft_id) : (paymentEntity?.notes?.draftId ? parseInt(paymentEntity.notes.draftId) : null);
+                const userId = paymentEntity?.notes?.user_id ? parseInt(paymentEntity.notes.user_id, 10) : (paymentEntity?.notes?.userId ? parseInt(paymentEntity.notes.userId, 10) : null);
+                const draftId = paymentEntity?.notes?.draft_id ? parseInt(paymentEntity.notes.draft_id, 10) : (paymentEntity?.notes?.draftId ? parseInt(paymentEntity.notes.draftId, 10) : null);
 
                 await prisma.$transaction(async (tx) => {
                     if (orderId) {
@@ -75,9 +75,9 @@ router.post(
             const paymentId = paymentEntity?.id;
             
             // Safe extraction supporting both camelCase and snake_case notes
-            const userId = paymentEntity?.notes?.user_id ? parseInt(paymentEntity.notes.user_id) : (paymentEntity?.notes?.userId ? parseInt(paymentEntity.notes.userId) : null);
-            const draftId = paymentEntity?.notes?.draft_id ? parseInt(paymentEntity.notes.draft_id) : (paymentEntity?.notes?.draftId ? parseInt(paymentEntity.notes.draftId) : null);
-            const creditsToAllocate = paymentEntity?.notes?.credits ? parseInt(paymentEntity.notes.credits) : (paymentEntity?.notes?.creditsToAllocate ? parseInt(paymentEntity.notes.creditsToAllocate) : 0);
+            const userId = paymentEntity?.notes?.user_id ? parseInt(paymentEntity.notes.user_id, 10) : (paymentEntity?.notes?.userId ? parseInt(paymentEntity.notes.userId, 10) : null);
+            const draftId = paymentEntity?.notes?.draft_id ? parseInt(paymentEntity.notes.draft_id, 10) : (paymentEntity?.notes?.draftId ? parseInt(paymentEntity.notes.draftId, 10) : null);
+            const creditsToAllocate = paymentEntity?.notes?.credits ? parseInt(paymentEntity.notes.credits, 10) : (paymentEntity?.notes?.creditsToAllocate ? parseInt(paymentEntity.notes.creditsToAllocate, 10) : 0);
 
             if (!orderId || !userId || !paymentId) {
                 return res.status(422).json({ error: 'Missing mandatory tracking metadata parameters' });
