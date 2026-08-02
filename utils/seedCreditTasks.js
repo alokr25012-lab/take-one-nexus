@@ -68,7 +68,7 @@ async function seedCreditTasks() {
 async function awardCreditTask(userId, triggerType) {
   try {
     const numericUserId = Number(userId);
-    if (isNaN(numericUserId)) return;
+    if (Number.isNaN(numericUserId)) return;
 
     // Find the task
     const task = await prisma.creditTask.findFirst({
