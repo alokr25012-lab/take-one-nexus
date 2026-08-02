@@ -9,7 +9,7 @@ export function formatDisplayName(name: string | null | undefined): string {
     .split(' ')
     .map(word => {
       if (!word) return '';
-      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      return word[0].toUpperCase() + word.slice(1).toLowerCase();
     })
     .join(' ');
 }

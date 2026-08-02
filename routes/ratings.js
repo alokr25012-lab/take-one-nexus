@@ -27,7 +27,7 @@ function getFormattedName(user) {
 router.get('/status/:ratedUserId', async (req, res) => {
   try {
     const ratedUserId = Number(req.params.ratedUserId);
-    if (isNaN(ratedUserId)) {
+    if (Number.isNaN(ratedUserId)) {
       return res.status(400).json({ success: false, message: 'Invalid Rated User ID' });
     }
 
@@ -91,11 +91,11 @@ router.post('/', authenticateUser, ratingLimiter, async (req, res) => {
     const ratedUserIdNum = Number(ratedUserId);
     const ratingNum = Number(rating);
 
-    if (isNaN(ratedUserIdNum)) {
+    if (Number.isNaN(ratedUserIdNum)) {
       return res.status(400).json({ success: false, message: 'Invalid Rated User ID' });
     }
 
-    if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+    if (Number.isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
       return res.status(400).json({ success: false, message: 'Rating must be an integer between 1 and 5' });
     }
 
@@ -219,7 +219,7 @@ router.post('/', authenticateUser, ratingLimiter, async (req, res) => {
 router.delete('/:ratedUserId', authenticateUser, ratingLimiter, async (req, res) => {
   try {
     const ratedUserId = Number(req.params.ratedUserId);
-    if (isNaN(ratedUserId)) {
+    if (Number.isNaN(ratedUserId)) {
       return res.status(400).json({ success: false, message: 'Invalid Rated User ID' });
     }
 
