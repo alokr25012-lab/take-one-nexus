@@ -84,8 +84,6 @@ try {
   const communityPostsRoutes = require('./routes/posts');
   const portfolioRoutes = require('./routes/portfolio');
   const ratingRoutes = require('./routes/ratings');
-  const servicesRoutes = require('./routes/services');
-  const pricingRoutes = require('./routes/pricing');
 
 const PORT = process.env.PORT || 3000;
 
@@ -239,8 +237,6 @@ app.use('/api/community', communityRoutes);
 app.use('/api/community', communityPostsRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/ratings', ratingRoutes);
-app.use('/api/services', servicesRoutes);
-app.use('/api/pricing', pricingRoutes);
 
 app.post('/api/groups/create', (req, res) => {
   res.status(403).json({
