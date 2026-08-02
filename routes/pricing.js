@@ -129,7 +129,7 @@ router.put('/admin/plans/:id', authenticateUser, requireAdmin, planValidation, a
 
   try {
     const planId = parseInt(req.params.id, 10);
-    if (isNaN(planId)) {
+    if (Number.isNaN(planId)) {
       return res.status(400).json({ success: false, message: 'Invalid plan ID' });
     }
 
@@ -181,7 +181,7 @@ router.put('/admin/plans/:id', authenticateUser, requireAdmin, planValidation, a
 router.delete('/admin/plans/:id', authenticateUser, requireAdmin, async (req, res) => {
   try {
     const planId = parseInt(req.params.id, 10);
-    if (isNaN(planId)) {
+    if (Number.isNaN(planId)) {
       return res.status(400).json({ success: false, message: 'Invalid plan ID' });
     }
 
