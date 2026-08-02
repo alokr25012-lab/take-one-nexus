@@ -27,7 +27,8 @@ export default function DeveloperIssuesPage() {
       const res = await fetch('/api/issues', {
         headers: { 'Content-Type': 'application/json' }
       });
-      const data = await res.json();
+      if (!res.ok) throw new Error("Request failed");
+const data = await res.json();
       if (res.status === 403) {
         setError('Access Denied. Admin Role Required.');
         return;
@@ -54,9 +55,10 @@ export default function DeveloperIssuesPage() {
         method: 'PUT',
         body: JSON.stringify({ status })
       });
-      const data = await res.json();
+      if (!res.ok) throw new Error("Request failed");
+const data = await res.json();
       if (data.success) {
-        setIssues(issues.map(issue => issue.id === id ? { ...issue, status } : issue));
+        setIssues((issues ?? []).map(issue => issue.id === id ? { ...issue, status } : issue));
       }
     } catch (err) {
       console.error(err);
@@ -67,7 +69,8 @@ export default function DeveloperIssuesPage() {
     if (!confirm('Are you sure you want to delete this issue?')) return;
     try {
       const res = await fetchWithCSRF(`/api/issues/${id}`, { method: 'DELETE' });
-      const data = await res.json();
+      if (!res.ok) throw new Error("Request failed");
+const data = await res.json();
       if (data.success) {
         setIssues(issues.filter(issue => issue.id !== id));
       }
@@ -94,7 +97,7 @@ export default function DeveloperIssuesPage() {
         {issues.length === 0 ? (
           <p className="text-gray-400">No issues reported.</p>
         ) : (
-          issues.map(issue => (
+          (issues ?? []).map(issue => (
             <div key={issue.id} className="border border-gray-800 bg-gray-900 rounded p-6 shadow-md">
               <div className="flex justify-between items-start mb-4">
                 <div>
