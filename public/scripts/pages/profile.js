@@ -475,9 +475,9 @@ async function initCreatorRatings(profileId, isEditing = false) {
         if (shouldBeInteractive) {
             container.querySelectorAll('.rating-star-icon.interactive').forEach(star => {
                 star.addEventListener('mouseover', function() {
-                    const hoverVal = parseInt(this.getAttribute('data-value'));
+                    const hoverVal = parseInt(this.getAttribute('data-value', 10));
                     container.querySelectorAll('.rating-star-icon.interactive').forEach(s => {
-                        const sVal = parseInt(s.getAttribute('data-value'));
+                        const sVal = parseInt(s.getAttribute('data-value', 10));
                         if (sVal <= hoverVal) {
                             s.classList.add('active');
                         } else {
@@ -488,7 +488,7 @@ async function initCreatorRatings(profileId, isEditing = false) {
 
                 star.addEventListener('mouseout', function() {
                     container.querySelectorAll('.rating-star-icon.interactive').forEach(s => {
-                        const sVal = parseInt(s.getAttribute('data-value'));
+                        const sVal = parseInt(s.getAttribute('data-value', 10));
                         const checkVal = userRating || currentAvg;
                         if (sVal <= checkVal) {
                             s.classList.add('active');
@@ -499,7 +499,7 @@ async function initCreatorRatings(profileId, isEditing = false) {
                 });
 
                 star.addEventListener('click', async function() {
-                    const clickVal = parseInt(this.getAttribute('data-value'));
+                    const clickVal = parseInt(this.getAttribute('data-value', 10));
                     try {
                         const submitRes = await API.ratings.submit(profileId, clickVal);
                         if (submitRes.success) {
@@ -641,7 +641,7 @@ async function loadProfile() {
     }
     
     // If we have a targetId and it's not us, fetch public profile
-    if (targetId && (!authUser || authUser.id !== parseInt(targetId))) {
+    if (targetId && (!authUser || authUser.id !== parseInt(targetId, 10))) {
         isOwner = false;
         try {
             const res = await fetch(`/api/users/public/${targetId}`);

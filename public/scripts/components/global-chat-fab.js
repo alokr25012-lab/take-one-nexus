@@ -320,7 +320,7 @@
     // Optimistic update
     btn.classList.toggle('is-liked');
     btn.querySelector('svg').setAttribute('fill', isLiked ? 'none' : 'currentColor');
-    const currentCount = parseInt(countEl.textContent) || 0;
+    const currentCount = parseInt(countEl.textContent, 10) || 0;
     countEl.textContent = isLiked ? Math.max(0, currentCount - 1) : currentCount + 1;
 
     try {
@@ -385,7 +385,7 @@
 
         // Update comment count
         const countEl = card.querySelector('.gf-comment-btn span');
-        if (countEl) countEl.textContent = parseInt(countEl.textContent || '0') + 1;
+        if (countEl) countEl.textContent = parseInt(countEl.textContent || '0', 10) + 1;
       }
     } catch (err) {
       console.warn('Comment failed:', err);

@@ -67,8 +67,8 @@ async function requireCommunityAdminOrModerator(req, res, next) {
  */
 router.get('/posts/global-feed', authenticateUser, async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(20, Math.max(1, parseInt(req.query.limit) || 10));
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(20, Math.max(1, parseInt(req.query.limit, 10) || 10));
     const skip = (page - 1) * limit;
     const currentUserId = Number(req.user.id);
 
