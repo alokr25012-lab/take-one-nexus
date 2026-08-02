@@ -58,7 +58,7 @@ const data = await res.json();
       if (!res.ok) throw new Error("Request failed");
 const data = await res.json();
       if (data.success) {
-        setIssues(issues.map(issue => issue.id === id ? { ...issue, status } : issue));
+        setIssues((issues ?? []).map(issue => issue.id === id ? { ...issue, status } : issue));
       }
     } catch (err) {
       console.error(err);

@@ -161,7 +161,7 @@ const useMessageQueue = (enabled: boolean) => {
   }, []);
   
   const updateMessageStatus = useCallback((tempId: string, status: QueuedMessage['status'], retryCount?: number) => {
-    setQueue(prev => prev.map(msg => 
+    setQueue(prev => (prev ?? []).map(msg => 
       msg.tempId === tempId 
         ? { ...msg, status, retryCount: retryCount !== undefined ? retryCount : msg.retryCount }
         : msg
