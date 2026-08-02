@@ -97,7 +97,7 @@ const data = await res.json();
         {issues.length === 0 ? (
           <p className="text-gray-400">No issues reported.</p>
         ) : (
-          issues.map(issue => (
+          (issues ?? []).map(issue => (
             <div key={issue.id} className="border border-gray-800 bg-gray-900 rounded p-6 shadow-md">
               <div className="flex justify-between items-start mb-4">
                 <div>

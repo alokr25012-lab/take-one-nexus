@@ -190,7 +190,7 @@ const useMessageQueue = (enabled: boolean) => {
   const scheduleRetry = useCallback((tempId: string, retryCount: number) => {
     const delay = getExponentialBackoffDelay(retryCount);
     const nextRetryAt = Date.now() + delay;
-    setQueue(prev => prev.map(msg =>
+    setQueue(prev => (prev ?? []).map(msg =>
       msg.tempId === tempId
         ? { ...msg, status: 'failed', retryCount, nextRetryAt }
         : msg
