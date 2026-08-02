@@ -29,28 +29,28 @@ async function loadReports() {
   if (!list) return;
 
   if (typeof API === 'undefined') {
-    list.innerHTML = '<div class="empty">Moderation API is still loading. Refresh if this message remains.</div>';
+    list.textContent = '<div class="empty">Moderation API is still loading. Refresh if this message remains.</div>';
     return;
   }
 
   if (!API.auth.isLoggedIn()) {
-    list.innerHTML = '<div class="empty">Login as an admin or moderator to view reports.</div>';
+    list.textContent = '<div class="empty">Login as an admin or moderator to view reports.</div>';
     return;
   }
 
   try {
-    list.innerHTML = '<div class="empty">Loading moderation reports...</div>';
+    list.textContent = '<div class="empty">Loading moderation reports...</div>';
     const response = await API.moderation.listReports(status);
     const reports = response.data || [];
 
     if (reports.length === 0) {
-      list.innerHTML = '<div class="empty">No reports found for this filter.</div>';
+      list.textContent = '<div class="empty">No reports found for this filter.</div>';
       return;
     }
 
-    list.innerHTML = reports.map(reportCard).join('');
+    list.textContent = reports.map(reportCard).join('');
   } catch (error) {
-    list.innerHTML = `<div class="empty">${escapeHTML(error.message || 'Could not load moderation reports.')}</div>`;
+    list.textContent = `<div class="empty">${escapeHTML(error.message || 'Could not load moderation reports.')}</div>`;
   }
 }
 

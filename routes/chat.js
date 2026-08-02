@@ -351,8 +351,8 @@ router.get('/messages/:conversationId', authenticateUser, [
       data: { is_read: true }
     });
 
-    const limit = parseInt(req.query.limit) || 50;
-    const before = req.query.before ? parseInt(req.query.before) : null;
+    const limit = parseInt(req.query.limit, 10) || 50;
+    const before = req.query.before ? parseInt(req.query.before, 10) : null;
 
     const messages = await prisma.message.findMany({
       where: { 
