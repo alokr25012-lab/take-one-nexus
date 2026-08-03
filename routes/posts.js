@@ -32,7 +32,7 @@ async function requireCommunityAdminOrModerator(req, res, next) {
     const communityId = Number(req.params.communityId);
     const userId = Number(req.user.id);
 
-    if (isNaN(communityId)) {
+    if (Number.isNaN(communityId)) {
       return res.status(400).json({ success: false, message: 'Invalid Community ID' });
     }
 
