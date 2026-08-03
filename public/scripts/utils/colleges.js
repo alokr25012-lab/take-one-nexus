@@ -12,7 +12,7 @@ const INDIAN_COLLEGES = [
   "Ahmedabad University", "Plaksha University"
 ];
 
-const UNIQUE_INDIAN_COLLEGES = [...new Set(INDIAN_COLLEGES)].sort();
+const UNIQUE_INDIAN_COLLEGES = [...new Set(INDIAN_COLLEGES)].sort((a, b) => a - b);
 
 if (typeof window !== 'undefined') {
   window.INDIAN_COLLEGES = UNIQUE_INDIAN_COLLEGES;
