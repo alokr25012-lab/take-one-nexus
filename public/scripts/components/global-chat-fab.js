@@ -320,7 +320,7 @@
     // Optimistic update
     btn.classList.toggle('is-liked');
     btn.querySelector('svg').setAttribute('fill', isLiked ? 'none' : 'currentColor');
-    const currentCount = parseInt(countEl.textContent) || 0;
+    const currentCount = parseInt(countEl.textContent, 10) || 0;
     countEl.textContent = isLiked ? Math.max(0, currentCount - 1) : currentCount + 1;
 
     try {
