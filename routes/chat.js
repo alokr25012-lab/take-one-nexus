@@ -119,7 +119,7 @@ function transformConversation(c, userId) {
   return {
     ...c,
     my_role: myMember ? myMember.role : 'Member',
-    canMembersMessage: groupSettings ? (groupSettings.canMembersMessage === 'Everyone' || groupSettings.canMembersMessage === true) : (communityGroup ? communityGroup.canMembersMessage : true),
+    canMembersMessage: groupSettings ? (groupSettings.canMembersMessage === 'Everyone' || groupSettings.canMembersMessage ) : (communityGroup ? communityGroup.canMembersMessage : true),
     groupSettings,
     community_id: communityGroup ? communityGroup.community_id : null,
     users: (c.members || []).map(m => ({ 
