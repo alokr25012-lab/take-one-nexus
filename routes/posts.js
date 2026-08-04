@@ -540,3 +540,5 @@ router.post(
 );
 
 module.exports = router;
+
+.catch(err => console.error("Promise.all failed:", err));
