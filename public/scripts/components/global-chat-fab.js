@@ -397,7 +397,7 @@
   function handleShare(post) {
     const url = window.location.origin + '/chat';
     if (navigator.share) {
-      navigator.share({ title: 'Check out this community post on TAKE ONE', url }).catch(() => {});
+      navigator.share({ title: 'Check out this community post on TAKE ONE', url }).catch( => console.error());
     } else if (navigator.clipboard) {
       navigator.clipboard.writeText(url).then(() => {
         if (typeof showToast === 'function') showToast('Link copied ✦');
