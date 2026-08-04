@@ -4108,7 +4108,7 @@ export default function ChatPage() {
                           min={1}
                           max={maxLimit}
                           value={customMembersCount}
-                          onChange={(e) => setCustomMembersCount(parseInt(e.target.value) || 0)}
+                          onChange={(e) => setCustomMembersCount(parseInt(e.target.value, 10) || 0)}
                           style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.05)', border: `1px solid ${isInvalid ? '#ff4d1a' : 'rgba(255,255,255,0.1)'}`, borderRadius: '6px', color: '#fff', fontSize: '14px', width: '100%' }}
                         />
                         {isInvalid && (
