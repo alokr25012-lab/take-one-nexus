@@ -29,7 +29,7 @@ async function loadReports() {
   if (!list) return;
 
   if (typeof API === 'undefined') {
-    list.innerHTML = '<div class="empty">Moderation API is still loading. Refresh if this message remains.</div>';
+    list.textContent = '<div class="empty">Moderation API is still loading. Refresh if this message remains.</div>';
     return;
   }
 
