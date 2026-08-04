@@ -112,7 +112,7 @@ router.post('/tasks', authenticateUser, requireAdmin, async (req, res) => {
   try {
     const { name, description, credits_rewarded, trigger_type, is_active = true } = req.body;
 
-    if (!name || !trigger_type || credits_rewarded == null) {
+    if (!name || !trigger_type || credits_rewarded === null) {
       return res.status(400).json({ success: false, message: 'name, trigger_type, and credits_rewarded are required' });
     }
 
