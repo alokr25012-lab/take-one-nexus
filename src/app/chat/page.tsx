@@ -4097,7 +4097,7 @@ export default function ChatPage() {
                   const perMemberPrice = customCfg ? Number(customCfg.per_member_price) : 2;
                   const maxLimit = customCfg ? Number(customCfg.max_members) : 1000;
                   const calculatedPrice = basePrice + (customMembersCount * perMemberPrice);
-                  const isInvalid = isNaN(customMembersCount) || customMembersCount < 1 || customMembersCount > maxLimit;
+                  const isInvalid = Number.isNaN(customMembersCount) || customMembersCount < 1 || customMembersCount > maxLimit;
 
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '16px', marginTop: '8px' }}>
