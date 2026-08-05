@@ -558,7 +558,7 @@ export default function ChatPage() {
           return {
             ...prev,
             groupSettings: updatedSettings,
-            ...(key === 'canMembersMessage' ? { canMembersMessage: value === 'Everyone' || value === true } : {})
+            ...(key === 'canMembersMessage' ? { canMembersMessage: value === 'Everyone' || value  } : {})
           };
         });
       } else {
