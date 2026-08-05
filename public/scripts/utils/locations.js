@@ -18,7 +18,7 @@ const INDIAN_CITIES = [
 ];
 
 // Deduplicate
-const UNIQUE_INDIAN_CITIES = [...new Set(INDIAN_CITIES)].sort();
+const UNIQUE_INDIAN_CITIES = [...new Set(INDIAN_CITIES)].sort((a, b) => a - b);
 
 if (typeof window !== 'undefined') {
   window.INDIAN_CITIES = UNIQUE_INDIAN_CITIES;
