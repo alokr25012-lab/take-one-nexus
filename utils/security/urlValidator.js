@@ -94,7 +94,7 @@ function isValidSecureUrl(urlString) {
         const p3 = parseInt(b2.substring(0, 2), 16);
         const p4 = parseInt(b2.substring(2, 4), 16);
         
-        if (!isNaN(p1) && !isNaN(p2) && !isNaN(p3) && !isNaN(p4)) {
+        if (!Number.isNaN(p1) && !isNaN(p2) && !isNaN(p3) && !isNaN(p4)) {
           return isValidSecureUrl(`https://${p1}.${p2}.${p3}.${p4}`);
         }
       }
