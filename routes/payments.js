@@ -182,7 +182,7 @@ router.post('/create-order', authenticateUser, paymentLimiter, createOrderValida
       console.warn('[Payments] Could not query dynamic payment systems, falling back to default:', dbErr.message);
     }
 
-    const amount = Math.round(amountVal * 100); // Convert to paise
+    const amount = Math.round(amountVal * 100 + Number.EPSILON); // Convert to paise
     const currency = currencyVal;
     let orderId = '';
 
