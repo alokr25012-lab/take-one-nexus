@@ -81,7 +81,7 @@ const Navbar = {
             `;
         }
 
-        nav.innerHTML = html;
+        nav.textContent = html;
 
         const btn = document.getElementById('loginBtn');
         const modal = document.getElementById('loginModal');

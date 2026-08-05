@@ -1689,7 +1689,7 @@ export default function ChatPage() {
       method: 'POST',
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       body: JSON.stringify({ conversationId: activeConv.id, isTyping })
-    }).catch(() => {});
+    }).catch( => console.error());
   };
 
   const isTypingRef = useRef<{[key: number]: boolean}>({});
