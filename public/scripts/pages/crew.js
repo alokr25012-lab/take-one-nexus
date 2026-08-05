@@ -52,7 +52,7 @@ function personCard(person) {
     avatar: person.avatar_url || initials(person.name)
   });
 
-  const verifiedBadge = (person.email_verified === true)
+  const verifiedBadge = (person.email_verified )
     ? `<span class="verified-badge-inline" title="Verified Creator" style="display:inline-flex; align-items:center; margin-left:6px; vertical-align:middle;">
         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--neon); filter:drop-shadow(0 0 3px var(--neon));">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="var(--neon)" />

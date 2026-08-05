@@ -134,7 +134,7 @@
       const data = await res.json();
       
       if (data.success && data.user) {
-        isVerified = data.user.email_verified === true;
+        isVerified = data.user.email_verified ;
         userEmail = data.user.email || '';
         
         if (!isVerified && shouldShowPopup()) {
