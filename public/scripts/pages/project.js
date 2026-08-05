@@ -210,7 +210,7 @@ async function uploadWork() {
         // Ensure Razorpay SDK is fully loaded
         const sdkLoaded = await loadRazorpaySDK();
         if (!sdkLoaded || typeof Razorpay === 'undefined') {
-            API.payments.cancel({ draft_id, razorpay_order_id: order_id }).catch(() => {});
+            API.payments.cancel({ draft_id, razorpay_order_id: order_id }).catch( => console.error());
             throw new Error('Razorpay payment gateway failed to load. Please check your internet connection.');
         }
 
