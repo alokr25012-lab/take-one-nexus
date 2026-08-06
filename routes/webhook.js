@@ -46,7 +46,7 @@ router.post(
             if (event === 'payment.failed') {
                 const paymentEntity = payload.payload?.payment?.entity;
                 const orderId = paymentEntity?.order_id;
-                const userId = paymentEntity?.notes?.user_id ? parseInt(paymentEntity.notes.user_id) : (paymentEntity?.notes?.userId ? parseInt(paymentEntity.notes.userId) : null);
+                const userId = paymentEntity?.notes?.user_id ? parseInt(paymentEntity.notes.user_id, 10) : (paymentEntity?.notes?.userId ? parseInt(paymentEntity.notes.userId) : null);
                 const draftId = paymentEntity?.notes?.draft_id ? parseInt(paymentEntity.notes.draft_id) : (paymentEntity?.notes?.draftId ? parseInt(paymentEntity.notes.draftId) : null);
 
                 await prisma.$transaction(async (tx) => {
