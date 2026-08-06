@@ -67,6 +67,6 @@ function populateRoleDropdowns() {
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
     populateRoleDropdowns();
-    setInterval(updateStatusBarTime, 1000);
+    clearInterval(window.__interval); window.__interval = setInterval(updateStatusBarTime, 1000);
     updateStatusBarTime();
 });
