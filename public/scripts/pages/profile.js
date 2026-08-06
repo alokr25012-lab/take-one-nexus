@@ -475,7 +475,7 @@ async function initCreatorRatings(profileId, isEditing = false) {
         if (shouldBeInteractive) {
             container.querySelectorAll('.rating-star-icon.interactive').forEach(star => {
                 star.addEventListener('mouseover', function() {
-                    const hoverVal = parseInt(this.getAttribute('data-value'));
+                    const hoverVal = parseInt(this.getAttribute('data-value', 10));
                     container.querySelectorAll('.rating-star-icon.interactive').forEach(s => {
                         const sVal = parseInt(s.getAttribute('data-value'));
                         if (sVal <= hoverVal) {

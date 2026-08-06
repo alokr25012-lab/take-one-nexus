@@ -464,7 +464,7 @@ app.use((err, req, res, next) => {
       .then(() => cleanupPendingCommunityPayments())
       .then(() => checkAndSendProfileReminders())
       .then(() => {
-        setInterval(cleanupPendingCommunityPayments, 15 * 60 * 1000);
+        clearInterval(window.__interval); window.__interval = setInterval(cleanupPendingCommunityPayments, 15 * 60 * 1000);
         setInterval(checkAndSendProfileReminders, 24 * 60 * 60 * 1000); // Check once a day
       })
       .catch((error) => {
