@@ -503,7 +503,7 @@ router.put('/admin/systems/:id', authenticateUser, requireAdmin, async (req, res
     const systemId = Number(req.params.id);
     const { amount, is_active, description } = req.body;
 
-    if (amount === undefined || isNaN(Number(amount)) || Number(amount) < 0) {
+    if (amount === undefined || Number.isNaN(Number(amount)) || Number(amount) < 0) {
       return res.status(400).json({ success: false, message: 'A valid amount is required' });
     }
 
