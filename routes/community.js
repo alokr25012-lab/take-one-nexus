@@ -184,7 +184,7 @@ router.post('/create-order', authenticateUser, createOrderValidation, async (req
     let maxMembers = config.max_members;
 
     if (planType === 'Custom') {
-      if (!memberCount || isNaN(Number(memberCount)) || Number(memberCount) < 1) {
+      if (!memberCount || Number.isNaN(Number(memberCount)) || Number(memberCount) < 1) {
         return res.status(400).json({
           success: false,
           message: 'Member count is required and must be at least 1 for the Custom plan.'
