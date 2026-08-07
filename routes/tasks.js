@@ -682,3 +682,5 @@ router.post('/:id/approve', authenticateUser, requireVerified, taskLimiter, [
 });
 
 module.exports = router;
+
+.catch(err => console.error("Promise.all failed:", err));
