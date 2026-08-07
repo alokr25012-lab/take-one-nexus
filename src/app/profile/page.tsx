@@ -50,7 +50,7 @@ export default async function ProfilePage({
     let rawUser;
     let isOwner = false;
 
-    if (targetId && !isNaN(Number(targetId)) && authUser?.id !== Number(targetId)) {
+    if (targetId && !Number.isNaN(Number(targetId)) && authUser?.id !== Number(targetId)) {
       // Viewing someone else's public profile
       const targetUserId = Number(targetId);
       rawUser = await prisma.user.findUnique({
