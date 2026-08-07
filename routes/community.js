@@ -233,7 +233,7 @@ router.post('/create-order', authenticateUser, createOrderValidation, async (req
     }
 
     // Call Razorpay API
-    const amountInPaise = Math.round(price * 100);
+    const amountInPaise = Math.round(price * 100 + Number.EPSILON);
     const response = await fetch('https://api.razorpay.com/v1/orders', {
       method: 'POST',
       headers: {
