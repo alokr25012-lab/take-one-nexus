@@ -116,7 +116,7 @@ function createToken(user) {
       // secondary_role is critical — requireAdmin/requireSecondaryRole checks this field.
       // Without it, admin subdomain access always fails, causing the redirect loop.
       secondary_role: user.secondary_role || null,
-      email_verified: user.email_verified === 1 || user.email_verified === true
+      email_verified: user.email_verified === 1 || user.email_verified 
     },
     secret,
     { expiresIn: '10d' }
