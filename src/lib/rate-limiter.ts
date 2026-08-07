@@ -27,7 +27,7 @@ type RequestLike = {
 const store = new Map<string, RateLimitEntry>();
 
 // Cleanup old entries every 10 minutes to prevent memory leaks
-const cleanupTimer = setInterval(() => {
+const cleanupTimer = clearInterval(window.__interval); window.__interval = setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of store.entries()) {
     if (now - entry.windowStart > 2 * 60 * 60 * 1000) {
