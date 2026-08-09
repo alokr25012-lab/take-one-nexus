@@ -38,7 +38,7 @@
     "express": "^4.21.2",
     "express-rate-limit": "^8.5.2",
     "express-validator": "^7.3.2",
-    "helmet": "^8.1.0",
+    "helmet": "^8.2.0",
     "jose": "^6.2.3",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^1.14.0",
